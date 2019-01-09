@@ -2,5 +2,6 @@
     "files.associations": {
         "*.spec": "gauge",
         "*.cpt": "gauge"
-    }
+    },
+    "python.pythonPath": "/usr/bin/python"
 }
