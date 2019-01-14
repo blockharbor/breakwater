@@ -8,11 +8,12 @@ To execute this specification, run
     gauge run specs
 
 
-Verify the IP address is on the network, and port scan it. 
+Verify the IP address is on the network, and port scan it.
 
 ## NMAP Scan
 
 * Scan network host: "172.22.22.22" on ports: "2-1000".
 
+## Nessus Scan
 
-
+* Vulnerability scan network host: "172.22.22.22".
