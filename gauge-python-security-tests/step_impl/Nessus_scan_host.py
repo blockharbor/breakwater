@@ -1,9 +1,9 @@
 
 import requests
-import nmap
 import tenable_io
+import os
 import sys
-sys.path.append('../credentials/')
+sys.path.append('/Users/brandonbarry/blockharbor/breakwater/gauge-python-security-tests/credentials')
 import tenable_io_creds
 from tenable_io.client import TenableIOClient
 from tenable_io.api.models import Scan
@@ -17,7 +17,7 @@ from getgauge.python import step, before_scenario, Messages
 # Gauge step implementations
 # --------------------------
 
-@step("Vulnerability scan network host: <ipAddr>.")
+@step("Nessus vulnerability scan network host: <ipAddr>.")
 def assert_nessus(ipAddr):
     '''
     # Generate unique name and file. Base this off of IP, date/time? Test, for now.
