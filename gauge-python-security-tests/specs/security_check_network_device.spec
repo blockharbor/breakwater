@@ -12,9 +12,13 @@ Verify the IP address is on the network, and port scan it.
 Once open ports are outlined and the host is confirmed to be up, run vulnerability scans against the host using OpenVAS and Nessus.
 
 
-## TODO: Start up devices. 
+## Test for new step implementation.
 
-* Turn on relay: "5". 
+* Perform Step Test: "5".
+
+## TODO: Start up devices.
+
+* Turn on relay: "5".
 
 ## NMAP Scan
 
@@ -27,3 +31,7 @@ Once open ports are outlined and the host is confirmed to be up, run vulnerabili
 ## OpenVAS Scan
 
 * OpenVAS vulnerability scan network host: "172.22.22.22".
+
+## Mailgun API Email Fuzz
+
+* Authenticate against restful API with key "<INSERT API TOKEN>" at endpoint "<YOUR MAILGUN URL>/messages" then fuzz endpoint with 100 requests starting with seed "<INSERT AN EMAIL ADDRESS HERE>".
