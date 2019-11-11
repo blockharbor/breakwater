@@ -1,0 +1,3 @@
+[default]
+interface = socketcan
+channel = vcan0
