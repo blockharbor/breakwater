@@ -1,0 +1,4 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Copyright (C) 2024-2026 Block Harbor Cybersecurity LLC
+exec /usr/bin/python3 /usr/share/breakwater/bw_cli.py "$@"
