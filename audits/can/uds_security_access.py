@@ -16,6 +16,7 @@ class uds_security_access(AuditRunner):
         Parameter("min_seed_len", "Expected Minimum Seed Length", "8", "The minimum number of bytes the seed shall be to pass this test"),
         Parameter("seeds_requested", "Number of Seeds Requested", "5", "Number of seeds requested when checking for duplicates"),
         Parameter("session", "Diagnostic session", "1", "The diagnostic session (or pair) to enter for this test"),
+        Parameter("uds_reset_after", "ECU Reset After Seeds", "0", "Send an ECU reset (0x11 0x01) after every this many seeds and re-enter the session, 0 disables it. A seed generator that restarts from a fixed state repeats its seeds after each reset"),
     ]
     dependencies = ['python-can', 'can-isotp']
     friendly_name = "UDS Security Access"
@@ -70,6 +71,25 @@ class uds_security_access(AuditRunner):
                 return False
         return True
 
+    def _uds_reset(self, sessions, timeout=5):
+        """Hard resets the ECU and re-enters the sessions once it answers again."""
+        import time
+        self.stack.send(bytearray([0x11, 0x01]))
+        end_time = time.time() + 1
+        while time.time() < end_time:
+            self.stack.process()
+            resp = self.stack.recv()
+            if resp is not None and resp[0] in [0x51, 0x7f]:
+                break
+            time.sleep(0.001)
+        # The ECU may take a while to come back after the reset
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            if self._uds_session_enter(sessions):
+                return True
+            time.sleep(0.1)
+        return False
+
     def run_audit(self):
         import can
         import isotp
@@ -95,6 +115,8 @@ class uds_security_access(AuditRunner):
         arb_resp = self.params["resp_arb"]
         min_seed_len = Parameter.number(self.params["min_seed_len"])
         seeds_requested = Parameter.number(self.params["seeds_requested"])
+        reset_after = Parameter.number(self.params["uds_reset_after"])
+        seed_count = 0
         sessions_raw = self.params["session"].strip()
         sessions = [int(s.strip(), 0) for s in sessions_raw.split(",")] if "," in sessions_raw else [int(sessions_raw, 0)]
         severity = "n/a"
@@ -138,6 +160,12 @@ class uds_security_access(AuditRunner):
 
                 if seed_resp[0] == 0x67:
                     session_seeds[access_level].append(seed_resp[2:].hex())
+                    seed_count += 1
+                    if reset_after and seed_count % reset_after == 0:
+                        self.log.debug(f'resetting the ECU after {seed_count} seeds')
+                        if not self._uds_reset(sessions):
+                            bus.shutdown()
+                            return {"params": self.params, "error": "Failed to re-enter session after ECU reset!"}
                     continue
 
                 if seed_resp[0] != 0x7f:

@@ -82,3 +82,54 @@ for params in [ sa_params1, sa_params1_fd ]:
             [b'\x27', b'\x7f\x27\x12'],
         ])
     )
+
+    # A generator that restarts from a fixed state on reset repeats its seeds,
+    # which only shows when the ECU is reset between requests
+    def restarting_generator():
+        table = [os.urandom(8) for _ in range(16)]
+        state = {'next': 0}
+        def seed(cue, sim):
+            s = table[state['next'] % len(table)]
+            state['next'] += 1
+            return bytes([0x67, 0x01]) + s
+        def reset(cue, sim):
+            state['next'] = 0
+            return b'\x51\x01'
+        return [
+            [b'\x10', lambda cue, sim: bytes([0x50, cue[1]])],
+            [b'\x11\x01', reset],
+            [bytes([0x27, 0x01]), seed],
+            [b'\x27', b'\x7f\x27\x12'],
+        ]
+    bw_tc('uds_security_access', bw_res.PASSED, params,
+        bw_tc_sim_iso14229('restarting_generator_no_reset', params, restarting_generator()))
+    reset_params = {**params, 'uds_reset_after': '4'}
+    bw_tc('uds_security_access', bw_res.FAILED, reset_params,
+        bw_tc_sim_iso14229('restarting_generator_reset', reset_params, restarting_generator()))
+
+    # Random seeds stay random across resets
+    bw_tc('uds_security_access', bw_res.PASSED, reset_params,
+        bw_tc_sim_iso14229('random_seeds_reset', reset_params, [
+            [b'\x10', lambda cue, sim: bytes([0x50, cue[1]])],
+            [b'\x11\x01', b'\x51\x01'],
+            [bytes([0x27, 0x01]), lambda cue, sim: bytes([0x67, 0x01]) + os.urandom(8)],
+            [b'\x27', b'\x7f\x27\x12'],
+        ])
+    )
+
+    # An ECU that does not come back after the reset is no result
+    def no_session_after_reset():
+        state = {'reset': False}
+        def session(cue, sim):
+            return b'' if state['reset'] else bytes([0x50, cue[1]])
+        def reset(cue, sim):
+            state['reset'] = True
+            return b'\x51\x01'
+        return [
+            [b'\x10', session],
+            [b'\x11\x01', reset],
+            [bytes([0x27, 0x01]), lambda cue, sim: bytes([0x67, 0x01]) + os.urandom(8)],
+            [b'\x27', b'\x7f\x27\x12'],
+        ]
+    bw_tc('uds_security_access', bw_res.NORESULT, reset_params,
+        bw_tc_sim_iso14229('no_session_after_reset', reset_params, no_session_after_reset()))
