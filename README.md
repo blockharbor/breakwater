@@ -52,6 +52,7 @@ bw_cli info --json                           # every audit, machine-readable
 bw_cli info --markdown > audits.md           # every audit as a docs page
 bw_cli interfaces                            # host interfaces as JSON
 bw_cli discover -p iface=can0                # UDS and XCP targets on can0
+bw_cli discover -p iface=can0 -p min_did=0x0000 -p max_did=0x00FF   # read DIDs 0x0000-0x00FF instead
 bw_cli run uds_security_access -p device=can0 -p req_arb=0x7e0 -p resp_arb=0x7e8
 bw_cli run telnet_check -p target_host=10.1.0.1 --report
 ```

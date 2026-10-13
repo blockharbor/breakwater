@@ -163,15 +163,31 @@ def _cmd_run(args):
     print(_style(result.status.name.replace('_', ' '), '1;' + colour, sys.stderr), file=sys.stderr)
     return int(result.status)
 
+def _did_param(params, key, default):
+    value = params.get(key, default)
+    try:
+        did = int(value, 0)
+    except ValueError:
+        raise UsageError(f'{key} "{value}" is not a number')
+    if not 0 <= did <= 0xFFFF:
+        raise UsageError(f'{key} {value} is outside 0x0000-0xFFFF')
+    return did
+
 def _cmd_discover(args):
-    iface = _params(args.parameter).get('iface')
+    params = _params(args.parameter)
+    iface = params.get('iface')
+    # Inclusive range of DIDs read with 0x22 in each session that supports it
+    min_did = _did_param(params, 'min_did', '0xF180')
+    max_did = _did_param(params, 'max_did', '0xF1A0')
+    if min_did > max_did:
+        raise UsageError(f'min_did {hex(min_did)} is above max_did {hex(max_did)}')
     try:
         from discover.can import discover_can
         from discover.xcp import discover_xcp
     except ImportError as e:
         return _unavailable('discovery', e)
     log = cli_logger('discover.' + (iface if iface else 'all'))
-    res = discover_can(iface, log) + discover_xcp(iface, log)
+    res = discover_can(iface, log, min_did=min_did, max_did=max_did) + discover_xcp(iface, log)
     print(json.dumps(res, indent=4))
     return os.EX_OK
 
@@ -231,7 +247,8 @@ def _build_parser():
     p.add_argument('--report', action='store_true', help='print the formatted report instead of the raw JSON result')
     p.set_defaults(func=_cmd_run)
 
-    p = sub.add_parser('discover', help='discover CAN (UDS) and XCP targets, -p iface=NAME limits it to one interface')
+    p = sub.add_parser('discover', help='discover CAN (UDS) and XCP targets, -p iface=NAME limits it to one interface, '
+                       '-p min_did=0xF180 -p max_did=0xF1A0 sets the DID read range')
     _add_param_arg(p)
     p.set_defaults(func=_cmd_discover)
 

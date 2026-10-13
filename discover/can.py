@@ -168,7 +168,7 @@ def discover_can_dids(tp, config, min_did=0xF180, max_did=0xF1A0):
     listener.start()
 
     did_id = min_did
-    while did_id < max_did:
+    while did_id <= max_did:
         tp.send(bytearray([0x22, (did_id >> 8) & 0xFF, did_id & 0xFF]))
         did_id = did_id + 1
         time.sleep(config["discover_speed"])
@@ -222,7 +222,8 @@ def discover_can_sessions(bus, is_fd, server, config):
 
 
 def discover_can_targets(
-    can_interface, is_fd, logger, detailed=True, config={"discover_speed": 0.05}
+    can_interface, is_fd, logger, detailed=True, config={"discover_speed": 0.05},
+    min_did=0xF180, max_did=0xF1A0
 ):
 
     rcon = dict()
@@ -234,10 +235,7 @@ def discover_can_targets(
     extended_max = 0x18DA0100
     extended_step = 0x1
 
-    min_did = 0xF180
-    max_did = 0xF1A0
-
-    # TODO add option to do intensive scan / control the scan range
+    # TODO add option to do intensive scan / control the arbitration ID range
 
     logger.info(f"discovering between {hex(normal_min)}-{hex(normal_max)}")
     servers = discover_can_servers(bus, is_fd, normal_min, normal_max, config)
@@ -300,7 +298,7 @@ def discover_can_targets(
 
     return rcon
 
-def discover_can(target_iface, logger):
+def discover_can(target_iface, logger, min_did=0xF180, max_did=0xF1A0):
     res = []
     errors = []
     interfaces = get_interfaces()
@@ -322,7 +320,7 @@ def discover_can(target_iface, logger):
         if 'fd_supported' in iface.keys():
             source['interface']['fd_supported'] = iface['fd_supported']
         try:
-            targets = discover_can_targets(iface['name'], False, logger)
+            targets = discover_can_targets(iface['name'], False, logger, min_did=min_did, max_did=max_did)
             for t_id in targets:
                 target = targets[t_id]
                 res.append({
@@ -334,7 +332,7 @@ def discover_can(target_iface, logger):
                     }
                 })
             if fd_capable:
-                targets = discover_can_targets(iface['name'], True, logger)
+                targets = discover_can_targets(iface['name'], True, logger, min_did=min_did, max_did=max_did)
                 for t_id in targets:
                     target = targets[t_id]
                     res.append({
