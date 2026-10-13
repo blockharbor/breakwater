@@ -167,7 +167,8 @@ class uds_security_access(AuditRunner):
 
         all_seeds = [seed for seeds in session_seeds.values() for seed in seeds]
         if len(all_seeds) > 0:
-            if min(len(seed) for seed in all_seeds) < min_seed_len:
+            # Seeds are kept as hex, two characters per byte
+            if min(len(seed) // 2 for seed in all_seeds) < min_seed_len:
                 test_results['fail_cond'] = 'seed_too_small'
                 test_results['pass_rules']['vulnerable'] = True
 

@@ -73,3 +73,12 @@ for params in [ sa_params1, sa_params1_fd ]:
     )
 
 
+
+    # min_seed_len is in bytes, a 4 byte seed is too short for 8
+    bw_tc('uds_security_access', bw_res.FAILED, {**params, 'min_seed_len': '8'},
+        bw_tc_sim_iso14229('seed_too_small_4_of_8', params, [
+            [b'\x10', lambda cue, sim: bytes([0x50, cue[1]])],
+            [bytes([0x27, 0x01]), lambda cue, sim: bytes([0x67, 0x01]) + os.urandom(4)],
+            [b'\x27', b'\x7f\x27\x12'],
+        ])
+    )
