@@ -10,6 +10,8 @@ class ccp_download(AuditRunner):
         Parameter("device", "CAN Interface", "can0", "The network interface on which to interact with the CAN Bus"),
         Parameter("extended_id", "Extended ID", "False", "Whether or not to use 29 bit arbitration IDs"),
         Parameter("is_fd", "Flexible Data Rate", "False", "Whether or not to use CAN FD frames for this test"),
+        Parameter("frame_len", "Static Frame Length", "0", "Pad every CAN frame out to this fixed length, 0 leaves each frame at its natural length. Lengths above 8 (12, 16, 20, 24, 32, 48, 64) require CAN FD"),
+        Parameter("frame_fill", "Frame Fill Byte", "0x00", "The byte used to pad frames up to the static frame length"),
         Parameter("req_arb", "Request Arbitration ID", "0x7e0", "The arbitration ID to send requests to"),
         Parameter("resp_arb", "Response Arbitration ID", "0x7e8", "The arbitration ID where replies will be sent"),
     ]
@@ -51,6 +53,8 @@ class ccp_download(AuditRunner):
     def ccp_exchange(self, can_data, timeout=0.2):
         import can
         import time
+        if len(can_data) < self.frame_len:
+            can_data = list(can_data) + [self.frame_fill] * (self.frame_len - len(can_data))
         msg = can.Message(
             arbitration_id=self.req_arb,
             data=can_data,
@@ -105,6 +109,12 @@ class ccp_download(AuditRunner):
         device = self.params["device"]
         self.extended_id = Parameter.boolean(self.params['extended_id'])
         self.is_fd = Parameter.boolean(self.params['is_fd'])
+        # A static frame length pads every frame out to that length with the
+        # fill byte, instead of letting the DLC follow the real payload size.
+        self.frame_len = Parameter.number(self.params["frame_len"])
+        self.frame_fill = Parameter.number(self.params["frame_fill"])
+        if self.frame_len > 8 and not self.is_fd:
+            return {"segments": [Report.create_text_segment("Static frame lengths above 8 bytes require CAN FD!")]}
         self.req_arb = Parameter.number(self.params["req_arb"])
         self.resp_arb = Parameter.number(self.params["resp_arb"])
 

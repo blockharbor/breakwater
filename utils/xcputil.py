@@ -109,9 +109,13 @@ class xcp:
         end_time = time.time() + timeout
         while time.time() < end_time:
             msg = self.bus.recv(timeout)
-            if msg is None or len(msg.data) < 2 or msg.arbitration_id != self.resp_arb:
+            if msg is None or len(msg.data) < 1 or msg.arbitration_id != self.resp_arb:
                 continue
             if msg.data[0] != 0xFF and msg.data[0] != 0xFE:
+                continue
+            # A positive response can be the bare PID (e.g. DISCONNECT or
+            # SET_MTA without padding), an error always carries its code.
+            if msg.data[0] == 0xFE and len(msg.data) < 2:
                 continue
             if len(msg.data) == 3 and msg.data[2] == 0x30:
                 continue  # CCP response

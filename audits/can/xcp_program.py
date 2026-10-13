@@ -10,6 +10,8 @@ class xcp_program(AuditRunner):
         Parameter("device", "CAN Interface", "can0", "The network interface on which to interact with the CAN Bus"),
         Parameter("extended_id", "Extended ID", "False", "Whether or not to use 29 bit arbitration IDs"),
         Parameter("is_fd", "Flexible Data Rate", "False", "Whether or not to use CAN FD frames for this test"),
+        Parameter("frame_len", "Static Frame Length", "0", "Pad every CAN frame out to this fixed length, 0 leaves each frame at its natural length. Lengths above 8 (12, 16, 20, 24, 32, 48, 64) require CAN FD"),
+        Parameter("frame_fill", "Frame Fill Byte", "0x00", "The byte used to pad frames up to the static frame length"),
         Parameter("req_arb", "Request Arbitration ID", "0x7e0", "The arbitration ID to send requests to"),
         Parameter("resp_arb", "Response Arbitration ID", "0x7e8", "The arbitration ID where replies will be sent"),
     ]
@@ -55,6 +57,8 @@ class xcp_program(AuditRunner):
     def xcp_exchange(self, can_data):
         import can
         import time
+        if len(can_data) < self.frame_len:
+            can_data = list(can_data) + [self.frame_fill] * (self.frame_len - len(can_data))
         msg = can.Message(
             arbitration_id=self.req_arb,
             data=can_data,
@@ -65,9 +69,13 @@ class xcp_program(AuditRunner):
         end_time = time.time() + 0.1
         while time.time() < end_time:
             resp = self.bus.recv(0.1)
-            if resp is None or len(resp.data) < 2 or resp.arbitration_id != self.resp_arb:
+            if resp is None or len(resp.data) < 1 or resp.arbitration_id != self.resp_arb:
                 continue
             if resp.data[0] != 0xFF and resp.data[0] != 0xFE:
+                continue
+            # A positive response can be the bare PID (e.g. DISCONNECT or
+            # SET_MTA without padding), an error always carries its code.
+            if resp.data[0] == 0xFE and len(resp.data) < 2:
                 continue
             if len(resp.data) == 3 and resp.data[2] == 0x30:
                 continue
@@ -146,6 +154,12 @@ class xcp_program(AuditRunner):
         device = self.params["device"]
         self.extended_id = Parameter.boolean(self.params['extended_id'])
         self.is_fd = Parameter.boolean(self.params['is_fd'])
+        # A static frame length pads every frame out to that length with the
+        # fill byte, instead of letting the DLC follow the real payload size.
+        self.frame_len = Parameter.number(self.params["frame_len"])
+        self.frame_fill = Parameter.number(self.params["frame_fill"])
+        if self.frame_len > 8 and not self.is_fd:
+            return {"segments": [Report.create_text_segment("Static frame lengths above 8 bytes require CAN FD!")]}
         self.req_arb = Parameter.number(self.params["req_arb"])
         self.resp_arb = Parameter.number(self.params["resp_arb"])
 
@@ -153,19 +167,17 @@ class xcp_program(AuditRunner):
         severity = "n/a"
 
         self.bus = can.Bus(device, interface="socketcan", fd=self.is_fd)
-        prog_res = self.try_program()
-        self.log.debug("initial prog_res:", prog_res)
+        # Connect before testing, a correct XCP server ignores every other
+        # command until it has seen CONNECT.
+        self.log.debug("attempting xcp connection")
+        if not self.try_connect():
+            self.bus.shutdown()
+            segments.append(Report.create_text_segment("Failed to connect to the XCP server."))
+            return {"segments": segments}
+        self.log.debug("successfully connected to XCP server")
 
-        if not prog_res:
-            self.log.debug("attempting xcp connection")
-            if self.try_connect():
-                self.log.debug("successfully connected to XCP server")
-                prog_res = self.try_program()
-                self.log.debug("connected program:", hex(prog_res))
-            else:
-                self.bus.shutdown()
-                segments.append(Report.create_text_segment("Failed to connect to the XCP server."))
-                return {"segments": segments}
+        prog_res = self.try_program()
+        self.log.debug("prog_res:", prog_res)
 
         if prog_res:
             severity = "high"

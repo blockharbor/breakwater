@@ -36,3 +36,11 @@ for params in [ AuditParams, AuditParams_fd ]:
 
     bw_tc('xcp_download', bw_res.PASSED, params, xcp_download_access_denied)
     bw_tc('xcp_download', bw_res.FAILED, params, xcp_download_access_granted)
+
+    # Positive responses are the bare PID, without padding.
+    xcp_download_unpadded = bw_tc_sim_can('xcp_download_unpadded_responses', params, [
+        [bytes([0xFF]), bytes([0xFF, 0x10, 0x08, 0x20, 0x04, 0x00, 0x08, 0x00])],
+        [bytes([0xF6]), bytes([0xFF])],
+        [bytes([0xF0]), bytes([0xFF])],
+    ])
+    bw_tc('xcp_download', bw_res.FAILED, params, xcp_download_unpadded)

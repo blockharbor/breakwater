@@ -55,3 +55,13 @@ for params in [ AuditParams, AuditParams_fd ]:
             [SHORT_UP_MSG, bytes([0xFF, 0x01, 0x00])],
         ])
     )
+
+    # SHORT_UP works without CONNECT, and CONNECT gets no answer. The read that
+    # got through must still be reported.
+    bw_tc(
+        'ccp_upload', bw_res.FAILED, params,
+        bw_tc_sim_can('short_upload_no_connect', params, [
+            [SET_MTA_MSG, bytes([0xFF, 0x2, 0x33])],
+            [SHORT_UP_MSG, bytes([0xFF, 0x01, 0x00])],
+        ])
+    )
