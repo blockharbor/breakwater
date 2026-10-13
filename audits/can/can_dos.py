@@ -4,7 +4,7 @@
 from framework import *
 
 
-def measure_load(bus, baud, timeout=3):
+def measure_load(bus, baud, log, timeout=3):
     import time
 
     recv_bits = 0
@@ -20,9 +20,7 @@ def measure_load(bus, baud, timeout=3):
         recv_bits = recv_bits + 55 + len(msg.data) * 10
 
     load = recv_bits * 100 / int(baud) / timeout
-    print(
-        f"CAN bus using about {load:.2f}% capacity"
-    )
+    log.info(f"CAN bus using about {load:.2f}% capacity")
     return load
 
 
@@ -84,11 +82,11 @@ class can_dos(AuditRunner):
 
         bus = can.Bus(interface="socketcan", channel=device)
 
-        before_load = measure_load(bus, baud)
+        before_load = measure_load(bus, baud, self.log)
         time.sleep(3)
         dos_bus(bus)
         time.sleep(3)
-        after_load = measure_load(bus, baud)
+        after_load = measure_load(bus, baud, self.log)
 
         bus.shutdown()
         delta = abs(after_load - before_load)

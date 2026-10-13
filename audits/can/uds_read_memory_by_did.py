@@ -140,7 +140,7 @@ class uds_read_memory_by_did(AuditRunner):
             )
 
             if not resp:
-                print("[-] no response from UDS server")
+                self.log.debug("[-] no response from UDS server")
                 continue
             if resp[0] == 0x6C:
                 read_resp = self.send([0x22] + list(did.to_bytes(2, "big")))

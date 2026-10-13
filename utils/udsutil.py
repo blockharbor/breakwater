@@ -2,6 +2,7 @@
 # Copyright (C) 2024-2026 Block Harbor Cybersecurity LLC
 
 import os
+import logging
 import can
 import sys
 import time
@@ -395,7 +396,7 @@ class isotp:
                 data_idx += (maxdlc-1)
                 bus.send(msg)
         else:
-            print("message too long for isotp frame")
+            logging.getLogger("breakwater").warning("message too long for isotp frame")
 
     def send(self, data, timeout=0.5):
         isotp._send(self.bus, self.req_arb, self.resp_arb, data, timeout, self.extended_arb, self.is_fd)

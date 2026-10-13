@@ -142,7 +142,7 @@ class uds_request_upload(AuditRunner):
                 resp = self._send(req)
 
                 if not resp or (resp[0] == 0x7F and resp[2] in [0x11, 0x7F]):
-                    print("no response")
+                    self.log.debug("no response")
                     break
 
                 elif resp[0] == 0x75:
