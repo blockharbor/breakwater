@@ -92,6 +92,8 @@ class uds_read_memory_by_did(AuditRunner):
         did = Parameter.number(self.params["did"])
         addr = Parameter.number(self.params["address"])
         size = Parameter.number(self.params["size"])
+        if not (0 <= addr < 1 << 32 and 0 <= size < 1 << 32):
+            return {"params": self.params, "error": "Address and size must fit in 4 bytes!"}
         sessions_raw = self.params["session"].strip()
         session = [int(s.strip(), 0) for s in sessions_raw.split(",")] if "," in sessions_raw else [int(sessions_raw, 0)]
         severity = "n/a"
@@ -124,6 +126,10 @@ class uds_read_memory_by_did(AuditRunner):
 
             addr_size = format_byte & 0xF
             size_size = (format_byte >> 4) & 0xF
+
+            # Skip formats too narrow to hold the address or size
+            if addr >= 1 << (8 * addr_size) or size >= 1 << (8 * size_size):
+                continue
 
             resp = self.send(
                 [0x2C, 0x02]

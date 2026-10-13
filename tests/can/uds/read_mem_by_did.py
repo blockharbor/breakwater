@@ -92,3 +92,39 @@ for params in [ audit_params, audit_params_fd ]:
             ]
         )
     )
+
+    # A 4 byte address does not fit the narrow formats, those are skipped
+    # instead of crashing and the 4 byte formats still get tested
+    wide_params = {**params, 'address': '0x12345678'}
+    bw_tc(
+        'uds_read_memory_by_did',
+        bw_res.FAILED,
+        wide_params,
+        bw_tc_sim_iso14229(
+            'allow_define_and_read_wide_address',
+            wide_params,
+            [
+                [b'\x10', lambda cue, sim: bytes([0x50, cue[1]])],
+                # allow define with a 4 byte address and 1 byte size
+                [b'\x2C\x02\xF0\x01\x14\x12\x34\x56\x78', b'\x6C\x02\xF0\x01'],
+                [b'\x2C', b'\x7F\x2C\x31'],
+                # allow read
+                [b'\x22\xF0\x01', b'\x62FLAG']
+            ]
+        )
+    )
+
+    # An address wider than any format is an error, not a crash
+    bw_tc(
+        'uds_read_memory_by_did',
+        bw_res.NORESULT,
+        {**params, 'address': '0x123456789A'},
+        bw_tc_sim_iso14229(
+            'address_too_wide',
+            params,
+            [
+                [b'\x10', lambda cue, sim: bytes([0x50, cue[1]])],
+                [b'\x2C', b'\x7F\x2C\x31'],
+            ]
+        )
+    )
