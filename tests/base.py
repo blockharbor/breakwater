@@ -3,12 +3,14 @@
 
 import os
 import time
-import can
 import socket
 import threading
 
 from framework import *
+enable_dependency_dir()         # same as bw_cli, so tests see what --install-deps installed
 list_audits()                   # registers the built-in audits into `audits`
+
+import can
 
 from utils.udsutil import *
 
