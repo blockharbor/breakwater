@@ -3,7 +3,7 @@
 # matching the Depends of the .deb (see the Makefile).
 python-can>=4.1         # CAN audits and discovery
 can-isotp>=2.0          # UDS audits and discovery
-pyroute2>=0.7.2,<0.8    # interface listing; 0.9 returns a list from link(), discover/hardware.py expects 0.7's tuple
+pyroute2>=0.7.2,<0.9    # interface listing (discover/hardware.py); capped at the newest in Debian, 0.8.1
 pyserial>=3.5           # serial port listing (discover/hardware.py)
 
 # Network audits

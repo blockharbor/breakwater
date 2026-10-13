@@ -50,8 +50,14 @@ def _banner(n_audits):
     print(f"\033[31m\033[1m  ╰──────╯  \033[0m", file=sys.stderr)
     print('', file=sys.stderr)
 
+# Version ranges for the install hint, matching requirements.txt
+DEP_PINS = {
+    'pyroute2': 'pyroute2>=0.7.2,<0.9',
+}
+
 def _unavailable(what, e):
     dist = {module: dist for dist, module in DEP_MODULES.items()}.get(e.name, e.name)
+    dist = f"'{DEP_PINS[dist]}'" if dist in DEP_PINS else dist
     print(f'bw_cli: {what} is unavailable: {e}', file=sys.stderr)
     if e.name:
         print(f'bw_cli: install it with: {sys.executable} -m pip install --target {dependency_dir()} {dist}', file=sys.stderr)

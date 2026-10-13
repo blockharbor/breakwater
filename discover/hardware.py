@@ -58,7 +58,8 @@ def get_interfaces():
 
                 link = ip_route.link("get", index=idx)
 
-                assert(type(link) == tuple)
+                # pyroute2 up to 0.8 returns a tuple, 0.9 and later a list
+                assert(len(link) == 1)
 
                 with open("/sys/class/net/" + f + "/mtu", "r") as mtu_f:
                     can_obj["mtu"] = int(mtu_f.read().strip())
@@ -147,7 +148,7 @@ def get_interfaces():
 
                     link = ip_route.link("get", index=idx)
 
-                    assert(type(link) == tuple)
+                    assert(len(link) == 1)
                     for attr in link[0]["attrs"]:
                         if attr[0] == "IFLA_STATS":
                             wifi_obj["stats"] = attr[1]
@@ -180,7 +181,7 @@ def get_interfaces():
 
                     link = ip_route.link("get", index=idx)
 
-                    assert(type(link) == tuple)
+                    assert(len(link) == 1)
                     for attr in link[0]["attrs"]:
                         if attr[0] == "IFLA_STATS":
                             eth_obj["stats"] = attr[1]

@@ -51,7 +51,7 @@ PRIORITY ?= optional
 # pip (`bw_cli run --install-deps`), the same route as custom audits, which is
 # why python3-pip is recommended.
 DEPENDS := -d "python3 (>= 3.9)" -d "python3-can (>= 4.1)" \
-           -d "python3-pyroute2 (>= 0.7.2)" -d "python3-pyroute2 (<< 0.8)" -d "python3-serial (>= 3.5)" \
+           -d "python3-pyroute2 (>= 0.7.2)" -d "python3-pyroute2 (<< 0.9)" -d "python3-serial (>= 3.5)" \
            -d "python3-paramiko (>= 2.11)" -d "python3-requests (>= 2.28)"
 RECOMMENDS ?= can-utils, python3-pip
 
