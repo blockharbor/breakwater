@@ -40,7 +40,7 @@ def dos_bus(bus, timeout=3):
 @register_audit("can_dos")
 class can_dos(AuditRunner):
     parameters = [
-        Parameter("device", "CAN Interface", "can0", "The network interface on which to interact with the CAN Bus"),
+        Parameter("iface", "CAN Interface", "can0", "The network interface on which to interact with the CAN Bus"),
         Parameter("baud", "Baud Rate", "500000", "The baud rate of the CAN network (e.g. 125000, 250000, 500000, 1000000)"),
     ]
     dependencies = ['python-can']
@@ -75,7 +75,7 @@ class can_dos(AuditRunner):
         import can
         import time
 
-        device = self.params["device"]
+        device = self.params["iface"]
         baud = int(self.params["baud"], 0)
 
         severity = "n/a"

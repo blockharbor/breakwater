@@ -183,7 +183,7 @@ class bw_tc_sim_can(bw_tc_base_sim):
             self.cues[action[0]] = action[1]
 
     def start(self):
-        self.bus = can.Bus(self.params['device'], interface='socketcan', fd=self.is_fd)
+        self.bus = can.Bus(self.params.get('iface', self.params.get('device')), interface='socketcan', fd=self.is_fd)
         super().start()
 
     def stop(self):
@@ -226,7 +226,7 @@ class bw_tc_sim_iso14229(bw_tc_base_sim):
             self.cues[action[0]] = action[1]
 
     def start(self):
-        self.bus = can.Bus(self.params['device'], interface='socketcan', fd=self.is_fd)
+        self.bus = can.Bus(self.params.get('iface', self.params.get('device')), interface='socketcan', fd=self.is_fd)
         self.tp = mk_isotp(self.bus, [self.resp_arb, self.req_arb], extended_id=self.is_extended_id, is_fd=self.is_fd)
         super().start()
 

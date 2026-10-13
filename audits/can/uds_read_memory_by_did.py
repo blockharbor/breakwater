@@ -5,7 +5,7 @@ from framework import *
 @register_audit("uds_read_memory_by_did")
 class uds_read_memory_by_did(AuditRunner):
     parameters = [
-        Parameter("device", "CAN Interface", "can0", "The network interface on which to interact with the CAN Bus"),
+        Parameter("iface", "CAN Interface", "can0", "The network interface on which to interact with the CAN Bus"),
         Parameter("extended_id", "Extended ID", "False", "Whether or not to use 29 bit arbitration IDs"),
         Parameter("is_fd", "Flexible Data Rate", "False", "Whether or not to use CAN FD frames for this test"),
         Parameter("frame_len", "Static Frame Length", "0", "Pad every CAN frame out to this fixed length, 0 leaves each frame at its natural length. Lengths above 8 (12, 16, 20, 24, 32, 48, 64) require CAN FD"),
@@ -72,7 +72,7 @@ class uds_read_memory_by_did(AuditRunner):
         import can
         import isotp
 
-        device = self.params["device"]
+        device = self.params["iface"]
         eid = Parameter.boolean(self.params['extended_id'])
         is_fd = Parameter.boolean(self.params['is_fd'])
 

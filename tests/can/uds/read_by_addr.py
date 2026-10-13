@@ -8,7 +8,7 @@ from tests.base import *
 from utils.udsutil import *
 
 rm_params1 = {
-    'device': 'vcan0',
+    'iface': 'vcan0',
     'extended_id': 'False',
     'req_arb': '0x7e0',
     'resp_arb': '0x7e8',
@@ -19,7 +19,7 @@ rm_params1 = {
     'frame_fill': '0x00',
 }
 rm_params1_fd = {
-    'device': 'vcan0',
+    'iface': 'vcan0',
     'extended_id': 'False',
     'req_arb': '0x7e0',
     'resp_arb': '0x7e8',

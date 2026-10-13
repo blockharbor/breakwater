@@ -10,6 +10,7 @@ from tests.base import *
 import tests.can
 import tests.net
 import tests.audit_path
+import tests.params
 
 failures = []
 for tc in bw_tc.all_test_cases:

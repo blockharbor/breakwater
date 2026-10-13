@@ -5,7 +5,7 @@ from tests.base import *
 from utils.udsutil import *
 
 audit_params = {
-    'device': 'vcan0',
+    'iface': 'vcan0',
     'extended_id': 'False',
     'req_arb': '0x7e0',
     'resp_arb': '0x7e8',
@@ -16,7 +16,7 @@ audit_params = {
     'frame_fill': '0x00',
 }
 audit_params_fd = {
-    'device': 'vcan0',
+    'iface': 'vcan0',
     'extended_id': 'False',
     'req_arb': '0x7e0',
     'resp_arb': '0x7e8',

@@ -20,9 +20,9 @@ EPILOG = """examples:
   bw_cli ls
   bw_cli info uds_security_access
   bw_cli info --json
-  bw_cli run uds_security_access -p device=can0 -p req_arb=0x7e0 -p resp_arb=0x7e8
+  bw_cli run uds_security_access -p iface=can0 -p req_arb=0x7e0 -p resp_arb=0x7e8
   bw_cli run telnet_check -p target_host=10.1.0.1 --json
-  bw_cli --audit-path ./my_audits run my_audit -p device=can0
+  bw_cli --audit-path ./my_audits run my_audit -p iface=can0
   bw_cli discover -p iface=can0
   bw_cli deps
 
@@ -177,7 +177,10 @@ def _did_param(params, key, default):
 
 def _cmd_discover(args):
     params = _params(args.parameter)
-    iface = params.get('iface')
+    # `device` is the older name for `iface`
+    if 'device' in params and 'iface' in params:
+        raise UsageError('set either iface or device, not both')
+    iface = params.get('iface', params.get('device'))
     # Inclusive range of DIDs read with 0x22 in each session that supports it
     min_did = _did_param(params, 'min_did', '0xF180')
     max_did = _did_param(params, 'max_did', '0xF1A0')
@@ -235,7 +238,7 @@ def _load_audit_paths(argv):
 
 def _add_param_arg(p):
     p.add_argument('-p', '--parameter', action='append', nargs='+', metavar='KEY=VALUE',
-                   help='set a parameter, e.g. -p device=can0 (repeatable)')
+                   help='set a parameter, e.g. -p iface=can0 (repeatable)')
 
 def _build_parser():
     parser = argparse.ArgumentParser(
@@ -267,7 +270,7 @@ def _build_parser():
     _audit_path_arg(p)
     p.set_defaults(func=_cmd_run)
 
-    p = sub.add_parser('discover', help='discover CAN (UDS) and XCP targets, -p iface=NAME limits it to one interface, '
+    p = sub.add_parser('discover', help='discover CAN (UDS) and XCP targets, -p iface=NAME (or device=NAME) limits it to one interface, '
                        '-p min_did=0xF180 -p max_did=0xF1A0 sets the DID read range')
     _add_param_arg(p)
     _audit_path_arg(p)

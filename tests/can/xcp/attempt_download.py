@@ -5,14 +5,14 @@ from tests.base import *
 from utils.xcputil import * 
 
 AuditParams = {
-    'device': 'vcan0',
+    'iface': 'vcan0',
     'extended_id': 'False',
     'req_arb': '0x7e0',
     'resp_arb': '0x7e8',
     'is_fd': 'False'
 }
 AuditParams_fd = {
-    'device': 'vcan0',
+    'iface': 'vcan0',
     'extended_id': 'False',
     'req_arb': '0x7e0',
     'resp_arb': '0x7e8',

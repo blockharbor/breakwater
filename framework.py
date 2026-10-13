@@ -334,6 +334,14 @@ def run_audit(audit_name, params=None, log=None, install_deps=False):
     log = log if log is not None else Logger(f'bw.{audit_name}')
     params = dict(params or {})
     log.warn(f"Running audit {audit.friendly_name}...")
+    # `device` is the older name for `iface`
+    if 'device' in params:
+        if 'iface' in params:
+            error = 'set either iface or device, not both'
+            log.error(error)
+            return AuditResult(Status.NO_RESULT, {'params': params, 'error': error}, _error_report(
+                'Conflicting Parameters', [Report.create_text_segment(error)]))
+        params['iface'] = params['device']
     for p in audit.parameters:
         if p.name not in params.keys():
             params[p.name] = p.default_value
