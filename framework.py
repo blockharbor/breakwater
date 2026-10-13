@@ -9,6 +9,9 @@ import os
 import re
 import sys
 import json
+import types
+import hashlib
+import inspect
 import logging
 import importlib
 import importlib.util
@@ -66,6 +69,67 @@ def _load_builtin():
     if not _builtin_loaded:
         importlib.import_module('audits')
         _builtin_loaded = True
+
+class AuditLoadError(Exception):
+    pass
+
+# Audits loaded from --audit-path: {name: (absolute path, sha256 of the code that ran)}
+_audit_files = {}
+
+def _load_audit_file(path, log):
+    with open(path, 'rb') as f:
+        code = f.read()
+    sha256 = hashlib.sha256(code).hexdigest()
+    stem = os.path.splitext(os.path.basename(path))[0]
+    module = types.ModuleType(f'bw_custom_{stem}_{sha256[:8]}')
+    module.__file__ = path
+
+    before = dict(audits)
+    try:
+        # Runs the bytes that were hashed, so the hash always matches what ran
+        exec(compile(code, path, 'exec'), module.__dict__)
+    except Exception as e:
+        audits.clear()
+        audits.update(before)
+        log.warn(f'skipping audit file {path}: {type(e).__name__}: {e}')
+        return
+
+    clashes = [name for name, cls in before.items() if audits[name] is not cls]
+    if clashes:
+        audits.clear()
+        audits.update(before)
+        raise AuditLoadError(f'{path} registers {", ".join(clashes)}, which is already loaded')
+    sys.modules[module.__name__] = module
+    for name in audits.keys() - before.keys():
+        _audit_files[name] = (path, sha256)
+
+def load_audit_path(path, log=None):
+    """Loads custom audits from a .py file, or from every .py file in a directory
+    (not recursive, names starting with _ or . are skipped). A file that fails to
+    import is skipped with a warning; an audit name that is already loaded raises
+    AuditLoadError."""
+    _load_builtin()
+    log = log if log is not None else Logger('bw.audit_path')
+    path = os.path.abspath(path)
+    if not os.path.exists(path):
+        raise AuditLoadError(f'{path} does not exist')
+    if os.path.isdir(path):
+        files = [os.path.join(path, f) for f in sorted(os.listdir(path))
+                 if f.endswith('.py') and not f.startswith(('_', '.'))]
+    elif path.endswith('.py'):
+        files = [path]
+    else:
+        raise AuditLoadError(f'{path} is not a .py file or a directory')
+    for f in files:
+        _load_audit_file(f, log)
+
+def _audit_source(name):
+    """The file an audit was loaded from and the SHA-256 of its contents."""
+    if name in _audit_files:
+        return _audit_files[name]
+    path = os.path.abspath(inspect.getsourcefile(get_audit(name)))
+    with open(path, 'rb') as f:
+        return path, hashlib.sha256(f.read()).hexdigest()
 
 def list_audits():
     """All registered audits as {name: AuditRunner subclass}, built-ins included."""
@@ -230,10 +294,13 @@ def describe_audit(name):
     """The audit's metadata as a JSON-safe dict with camelCase keys
     (friendlyName, failCondition, ...)."""
     audit = get_audit(name)
+    source, sha256 = _audit_source(name)
     return {
         'name': name,
         'friendlyName': audit.friendly_name,
-        'fileName': audit.__module__.rsplit('.', 1)[-1] + '.py',
+        'fileName': os.path.basename(source),
+        'source': source,
+        'sha256': sha256,
         'description': audit.description,
         'failCondition': audit.fail_condition,
         'relevantMitigations': list(audit.relevant_mitigations),

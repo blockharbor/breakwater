@@ -76,7 +76,9 @@ class bw_tc:
             self.sim.start()
             started = True
             start_time = time.time()
-            self.result = run_audit(self.audit_name, self.params, self.logger)
+            # Install what an audit is missing, so a test checks the audit and
+            # not whether this machine happens to have its dependencies
+            self.result = run_audit(self.audit_name, self.params, self.logger, install_deps=True)
             self.tc_duration = time.time() - start_time
             if 'traceback' in self.result.raw:
                 self.error = f'audit raised {self.result.raw["error"]}\n{self.result.raw["traceback"]}'
@@ -107,6 +109,35 @@ class bw_tc:
                 print('#', fmt['title'])
                 for seg in fmt['segments']:
                     print('\t', seg)
+
+
+class bw_tc_func:
+    """A plain check that is not an audit run, e.g. for the audit loader. The
+    function passes by returning and fails by raising."""
+    def __init__(self, name, func):
+        self.name = name
+        self.func = func
+        self.tc_duration = 0
+        self.error = None
+
+        bw_tc.all_test_cases.append(self)
+
+    def __repr__(self):
+        return self.name.ljust(80) + ''.rjust(12) + f'{(self.tc_duration//60):02.0f}:{self.tc_duration%60:05.2f}'.rjust(10)
+
+    def exec(self):
+        import traceback
+        start_time = time.time()
+        try:
+            self.func()
+        except Exception:
+            self.error = traceback.format_exc()
+        self.tc_duration = time.time() - start_time
+        return self.error is None
+
+    def report(self, show_log=False):
+        if self.error:
+            print('[error]', self.error)
 
 
 class bw_tc_base_sim:

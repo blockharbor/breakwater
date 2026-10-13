@@ -10,8 +10,9 @@ import time
 import shutil
 import argparse
 
-from framework import (DEP_MODULES, Logger, Status, describe_audit, dependency_dir, enable_dependency_dir,
-                       get_version, list_audits, missing_dependencies, run_audit)
+from framework import (DEP_MODULES, AuditLoadError, Logger, Status, describe_audit, dependency_dir,
+                       enable_dependency_dir, get_version, list_audits, load_audit_path, missing_dependencies,
+                       run_audit)
 
 DOCS_URL = 'https://docs.blockharbor.io'
 
@@ -20,7 +21,8 @@ EPILOG = """examples:
   bw_cli info uds_security_access
   bw_cli info --json
   bw_cli run uds_security_access -p device=can0 -p req_arb=0x7e0 -p resp_arb=0x7e8
-  bw_cli run telnet_check -p target_host=10.1.0.1 --report
+  bw_cli run telnet_check -p target_host=10.1.0.1 --json
+  bw_cli --audit-path ./my_audits run my_audit -p device=can0
   bw_cli discover -p iface=can0
   bw_cli deps
 
@@ -151,13 +153,13 @@ def _cmd_run(args):
                      f"Install them with `bw_cli run {name} --install-deps`.")
         return os.EX_UNAVAILABLE
 
-    if args.report:
+    if args.json:
+        print(json.dumps(result.raw, indent=4))
+    else:
         for section in result.report:
             print(_style(section['title'], '1'))
             for segment in section['segments']:
                 print(segment)
-    else:
-        print(json.dumps(result.raw, indent=4))
 
     colour = {Status.PASSED: '32', Status.FAILED: '31', Status.NO_RESULT: '33'}[result.status]
     print(_style(result.status.name.replace('_', ' '), '1;' + colour, sys.stderr), file=sys.stderr)
@@ -217,6 +219,20 @@ def _cmd_deps(args):
         print(f"  {name.ljust(24)} {', '.join(audit.dependencies).ljust(28)} {state}")
     return os.EX_OK
 
+def _audit_path_arg(p):
+    # Read by _load_audit_paths before parsing; declared here for --help and so
+    # the option is accepted before or after the command.
+    p.add_argument('--audit-path', action='append', metavar='PATH', default=argparse.SUPPRESS,
+                   help='load custom audits from a .py file or a directory of them (repeatable)')
+
+def _load_audit_paths(argv):
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument('--audit-path', action='append', default=[])
+    known, _ = pre.parse_known_args(argv)
+    log = cli_logger('audit_path')
+    for path in known.audit_path:
+        load_audit_path(path, log)
+
 def _add_param_arg(p):
     p.add_argument('-p', '--parameter', action='append', nargs='+', metavar='KEY=VALUE',
                    help='set a parameter, e.g. -p device=can0 (repeatable)')
@@ -226,9 +242,11 @@ def _build_parser():
         prog='bw_cli', description='Security audits and target discovery for automotive CAN and network interfaces.',
         epilog=EPILOG, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-V', '--version', action='version', version=f'Breakwater {get_version()}')
+    _audit_path_arg(parser)
     sub = parser.add_subparsers(dest='command', metavar='command')
 
     p = sub.add_parser('ls', help='list audits')
+    _audit_path_arg(p)
     p.set_defaults(func=_cmd_ls)
 
     p = sub.add_parser('info', help='show audit metadata')
@@ -236,6 +254,7 @@ def _build_parser():
     fmt = p.add_mutually_exclusive_group()
     fmt.add_argument('--markdown', action='store_true', help='print a Markdown docs page')
     fmt.add_argument('--json', action='store_true', help='print machine-readable JSON')
+    _audit_path_arg(p)
     p.set_defaults(func=_cmd_info)
 
     p = sub.add_parser('run', help='run one audit')
@@ -244,25 +263,34 @@ def _build_parser():
     _add_param_arg(p)
     p.add_argument('--install-deps', action='store_true',
                    help="install missing audit dependencies into Breakwater's own directory (see `bw_cli deps`)")
-    p.add_argument('--report', action='store_true', help='print the formatted report instead of the raw JSON result')
+    p.add_argument('--json', action='store_true', help='print the raw result as JSON instead of the readable report')
+    _audit_path_arg(p)
     p.set_defaults(func=_cmd_run)
 
     p = sub.add_parser('discover', help='discover CAN (UDS) and XCP targets, -p iface=NAME limits it to one interface, '
                        '-p min_did=0xF180 -p max_did=0xF1A0 sets the DID read range')
     _add_param_arg(p)
+    _audit_path_arg(p)
     p.set_defaults(func=_cmd_discover)
 
     p = sub.add_parser('interfaces', help='list the host interfaces as JSON')
+    _audit_path_arg(p)
     p.set_defaults(func=_cmd_interfaces)
 
     p = sub.add_parser('deps', help="show or delete Breakwater's own dependency directory")
     p.add_argument('--clean', action='store_true', help='delete the directory')
+    _audit_path_arg(p)
     p.set_defaults(func=_cmd_deps)
 
     return parser
 
 def main(argv=None):
     enable_dependency_dir()
+    try:
+        _load_audit_paths(argv)
+    except AuditLoadError as e:
+        print(f'bw_cli: {e}', file=sys.stderr)
+        return os.EX_USAGE
     _banner(len(list_audits()))     # before parsing, so --help and usage errors show it too
 
     parser = _build_parser()

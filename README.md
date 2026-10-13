@@ -54,14 +54,15 @@ bw_cli interfaces                            # host interfaces as JSON
 bw_cli discover -p iface=can0                # UDS and XCP targets on can0
 bw_cli discover -p iface=can0 -p min_did=0x0000 -p max_did=0x00FF   # read DIDs 0x0000-0x00FF instead
 bw_cli run uds_security_access -p device=can0 -p req_arb=0x7e0 -p resp_arb=0x7e8
-bw_cli run telnet_check -p target_host=10.1.0.1 --report
+bw_cli run telnet_check -p target_host=10.1.0.1 --json
 ```
 
 From a checkout, use `./bw_cli.py` in place of `bw_cli`.
 
-`run` prints the audit's raw result as JSON on stdout (or the formatted report
-with `--report`); progress goes to stderr. Parameters you don't set take the
-defaults shown by `bw_cli info`.
+`run` prints a readable report on stdout, or the audit's raw result as JSON with
+`--json`; progress and the final verdict go to stderr, so stdout holds only the
+report or the JSON. Parameters you don't set take the defaults shown by
+`bw_cli info`.
 
 | Exit code | Meaning |
 |-----------|---------|
@@ -79,6 +80,27 @@ Breakwater's own directory, `~/.local/share/breakwater/lib/python3.X` (set
 `BW_HOME` to move it). Breakwater never installs into the Python environment
 it runs from. `bw_cli deps` shows the directory and what each audit needs;
 `bw_cli deps --clean` deletes it.
+
+### Custom audits
+
+`--audit-path` loads audits from a `.py` file, or from every `.py` file in a
+directory (not recursive; names starting with `_` or `.` are skipped). It works
+with every command and can be repeated:
+
+```bash
+bw_cli --audit-path ./my_audits ls
+bw_cli run my_audit --audit-path ./my_audits/my_audit.py -p device=can0
+```
+
+A custom audit is written like the built-in ones in `audits/`: it imports
+`framework` and registers itself with `@register_audit("name")`.
+
+- A file that fails to import is skipped with a warning; the others still load.
+- An audit name that is already loaded, built-in or custom, is a usage error
+  (exit code 64), so a custom audit cannot replace a built-in one.
+
+`bw_cli info --json` reports every audit's `source` (the file it was loaded
+from) and the `sha256` of that file, so a run can be traced to the exact code.
 
 ## Tests
 
