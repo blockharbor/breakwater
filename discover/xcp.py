@@ -118,9 +118,10 @@ def discover_xcp_commands(bus, is_fd, server, config):
     # Probe every XCP command with an empty (no-parameter) request. A slave
     # that implements a command answers with a positive response (PID 0xFF) or
     # a parameter error (PID 0xFE, e.g. OUT_OF_RANGE); one that does not answers
-    # with ERR_CMD_UNKNOWN. "Supported" means any reply whose PID is not the
-    # error PID (0xFE). Errored replies are recorded so the
-    # report can distinguish "not implemented" from "recognised but rejected".
+    # with ERR_CMD_UNKNOWN. "Supported" means any reply other than
+    # ERR_CMD_UNKNOWN, since a rejected empty request still shows the command
+    # exists. Error codes are recorded so the report can tell "recognised but
+    # rejected" from "accepted".
     supported = []
     errors = {}
     xc = mk_xcp(bus, server, is_fd=is_fd)
@@ -141,6 +142,8 @@ def discover_xcp_commands(bus, is_fd, server, config):
             supported.append(cmd)
         elif len(reply) > 1:
             errors[cmd] = reply[1]
+            if reply[1] != 0x20:  # ERR_CMD_UNKNOWN
+                supported.append(cmd)
 
     # Leave the slave in a clean state.
     xc.send([0xFE, 0, 0, 0, 0, 0, 0, 0])
