@@ -572,7 +572,7 @@ def check_did_read_support(tp, supported_sessions, min_did=0x0000, max_did=0xFFF
 
 
 def check_did_write_support(tp, did_table, min_did=0x0000, max_did=0xFFFF):
-    # scan through range of dids
+    # scan through range of DIDs
     for id in range(min_did, max_did + 1):
         data_value = []
 
@@ -603,7 +603,7 @@ def check_did_write_support(tp, did_table, min_did=0x0000, max_did=0xFFFF):
 
 
 def check_did_control_support(tp, did_table, min_did=0x0000, max_did=0xFFFF):
-    # scan through range of dids
+    # scan through range of DIDs
     for id in range(min_did, max_did + 1):
         data_value = []
         controls = []

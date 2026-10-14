@@ -281,7 +281,7 @@ def discover_can_targets(
 
             if detailed:
                 if 0x22 in services:
-                    logger.info(f"discovering dids on {server} @ session {session}")
+                    logger.info(f"discovering DIDs on {server} @ session {session}")
                     details[0x22] = discover_can_dids(
                         tp, config, min_did=min_did, max_did=max_did
                     )

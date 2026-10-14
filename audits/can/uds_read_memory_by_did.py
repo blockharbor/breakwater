@@ -12,15 +12,15 @@ class uds_read_memory_by_did(AuditRunner):
         Parameter("frame_fill", "Frame Fill Byte", "0x00", "The byte used to pad frames up to the static frame length"),
         Parameter("req_arb", "Request Arbitration ID", "0x7e0", "The arbitration ID to send requests to"),
         Parameter("resp_arb", "Response Arbitration ID", "0x7e8", "The arbitration ID where replies will be sent"),
-        Parameter("did", "Attempted DID to define", "0xF000", "The actual did to attempt to be defined as memory"),
+        Parameter("did", "Attempted DID to define", "0xF000", "The actual DID to attempt to be defined as memory"),
         Parameter("address", "Attempted address to read", "0x0", "The actual address to attempt to read from"),
         Parameter("size", "Attempted size to read", "0x10", "The actual size to attempt to read from"),
         Parameter("session", "Diagnostic session", "1", "The diagnostic session (or pair) to enter for this test"),
     ]
     dependencies = ['python-can', 'can-isotp']
-    friendly_name = "UDS Read Memory by Did"
+    friendly_name = "UDS Read Memory by DID"
     description = (
-        "Attempts to dynamically define a did as a memory regoin, and read memory"
+        "Attempts to dynamically define a DID as a memory region, and read memory"
     )
     fail_condition = "Able to read memory"
     relevant_mitigations = [""]
@@ -176,7 +176,7 @@ class uds_read_memory_by_did(AuditRunner):
             ]}]
 
 
-        title = "UDS Read Memory By Did"
+        title = "UDS Read Memory By DID"
         segments = []
 
         for k, v in results["memory_contents"].items():
