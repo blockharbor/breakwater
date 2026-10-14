@@ -226,7 +226,7 @@ def pip_install(deps, log):
 
     target = dependency_dir()
     try:
-        log.warn(f'Attempting to install {deps} into {target}')
+        log.info(f'Attempting to install {deps} into {target}')
         subprocess.check_call([sys.executable, "-m", "pip", "install", "--target", target] + deps)
         enable_dependency_dir()
         log.info(f'Successfully installed {deps}')
@@ -333,7 +333,7 @@ def run_audit(audit_name, params=None, log=None, install_deps=False):
     audit = get_audit(audit_name)
     log = log if log is not None else Logger(f'bw.{audit_name}')
     params = dict(params or {})
-    log.warn(f"Running audit {audit.friendly_name}...")
+    log.info(f"Running audit {audit.friendly_name}...")
     # `device` is the older name for `iface`
     if 'device' in params:
         if 'iface' in params:
@@ -389,5 +389,5 @@ def run_audit(audit_name, params=None, log=None, install_deps=False):
     status = Status.NO_RESULT
     if "pass_rules" in results:
         status = Status.FAILED if results["pass_rules"]["vulnerable"] else Status.PASSED
-    log.warn(f'{audit.friendly_name} {status.name.replace("_", " ")}')
+    log.info(f'{audit.friendly_name} {status.name.replace("_", " ")}')
     return AuditResult(status, results, formatted_results)

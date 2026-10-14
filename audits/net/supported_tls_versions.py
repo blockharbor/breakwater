@@ -138,7 +138,7 @@ class supported_tls_versions(AuditRunner):
                     self.log.debug(line)
             elif b"CONNECTED" in output.stdout:
                 supported_versions.append(i)
-                self.log.warn(version_names[i] + " allowed")
+                self.log.info(version_names[i] + " allowed")
                 for line in output.stdout.decode('utf-8').split('\n'):
                     self.log.debug(line)
                 segments.append(Report.create_text_segment(version_names[i] + 'accepted'))

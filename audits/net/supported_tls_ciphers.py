@@ -170,7 +170,7 @@ class supported_tls_ciphers(AuditRunner):
             cond1 = f'Cipher is {cipher}'.encode() in output.stdout
             cond2 = b'unable to verify the first certificate verify return' in output.stderr
             if cond1 or cond2:
-                self.log.warn(f'Successfully connected with {cipher_v} {cipher}')
+                self.log.info(f'Successfully connected with {cipher_v} {cipher}')
                 ciphers_accepted.append(cipher)
                 if cipher in self.allowed_ciphers:
                     segments.append(Report.create_text_segment(f'Accepted: {cipher}'))

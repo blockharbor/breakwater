@@ -181,12 +181,12 @@ class telnet_check(AuditRunner):
         for user, password in acc_list:
             creds = f'"{user}:{password}"'
             try:
-                self.log.warn(f'Trying credentials {creds}')
+                self.log.debug(f'Trying credentials {creds}')
                 resp = self._try_login(target, port, user, password)
                 if resp:
                     vulnerable = True
-                    self.log.warn(f'Logged in as', resp)
-                    self.log.warn(f"Telnet on {target}:{port} provides shell access, test FAILED")
+                    self.log.info(f'Logged in as', resp)
+                    self.log.info(f"Telnet on {target}:{port} provides shell access, test FAILED")
                     segments.append(Report.create_text_segment(f'Credentials {creds} accepted and provide shell access on {target}:{port}!'))
                 else:
                     self.log.debug(f"Credentials {creds} rejected or no shell access on {target}:{port}.")

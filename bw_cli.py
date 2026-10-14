@@ -6,6 +6,7 @@
 import os
 import sys
 import json
+import logging
 import time
 import shutil
 import argparse
@@ -35,7 +36,12 @@ class UsageError(Exception):
     pass
 
 class cli_logger(Logger):
+    # Lowest level printed: warnings and errors by default, -v adds info, -vv debug
+    level = logging.WARNING
+
     def log(self, log_level, msg):
+        if self.LEVELS.get(log_level, logging.INFO) < cli_logger.level:
+            return
         print(f'{time.time():.4f}: {log_level} [{self.name}]: {msg}', file=sys.stderr, flush=True)
 
 def _style(text, code, stream=sys.stdout):
@@ -228,6 +234,14 @@ def _audit_path_arg(p):
     p.add_argument('--audit-path', action='append', metavar='PATH', default=argparse.SUPPRESS,
                    help='load custom audits from a .py file or a directory of them (repeatable)')
 
+def _verbose_arg(p):
+    p.add_argument('-v', '--verbose', action='count', default=argparse.SUPPRESS,
+                   help='also log info messages, -vv adds debug messages')
+
+def _common_args(p):
+    _audit_path_arg(p)
+    _verbose_arg(p)
+
 def _load_audit_paths(argv):
     pre = argparse.ArgumentParser(add_help=False)
     pre.add_argument('--audit-path', action='append', default=[])
@@ -245,11 +259,11 @@ def _build_parser():
         prog='bw_cli', description='Security audits and target discovery for automotive CAN and network interfaces.',
         epilog=EPILOG, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-V', '--version', action='version', version=f'Breakwater {get_version()}')
-    _audit_path_arg(parser)
+    _common_args(parser)
     sub = parser.add_subparsers(dest='command', metavar='command')
 
     p = sub.add_parser('ls', help='list audits')
-    _audit_path_arg(p)
+    _common_args(p)
     p.set_defaults(func=_cmd_ls)
 
     p = sub.add_parser('info', help='show audit metadata')
@@ -257,7 +271,7 @@ def _build_parser():
     fmt = p.add_mutually_exclusive_group()
     fmt.add_argument('--markdown', action='store_true', help='print a Markdown docs page')
     fmt.add_argument('--json', action='store_true', help='print machine-readable JSON')
-    _audit_path_arg(p)
+    _common_args(p)
     p.set_defaults(func=_cmd_info)
 
     p = sub.add_parser('run', help='run one audit')
@@ -267,22 +281,22 @@ def _build_parser():
     p.add_argument('--install-deps', action='store_true',
                    help="install missing audit dependencies into Breakwater's own directory (see `bw_cli deps`)")
     p.add_argument('--json', action='store_true', help='print the raw result as JSON instead of the readable report')
-    _audit_path_arg(p)
+    _common_args(p)
     p.set_defaults(func=_cmd_run)
 
     p = sub.add_parser('discover', help='discover CAN (UDS) and XCP targets, -p iface=NAME (or device=NAME) limits it to one interface, '
                        '-p min_did=0xF180 -p max_did=0xF1A0 sets the DID read range')
     _add_param_arg(p)
-    _audit_path_arg(p)
+    _common_args(p)
     p.set_defaults(func=_cmd_discover)
 
     p = sub.add_parser('interfaces', help='list the host interfaces as JSON')
-    _audit_path_arg(p)
+    _common_args(p)
     p.set_defaults(func=_cmd_interfaces)
 
     p = sub.add_parser('deps', help="show or delete Breakwater's own dependency directory")
     p.add_argument('--clean', action='store_true', help='delete the directory')
-    _audit_path_arg(p)
+    _common_args(p)
     p.set_defaults(func=_cmd_deps)
 
     return parser
@@ -301,6 +315,9 @@ def main(argv=None):
     if not getattr(args, 'command', None):
         parser.print_help()
         return os.EX_OK
+
+    verbose = getattr(args, 'verbose', 0)
+    cli_logger.level = logging.DEBUG if verbose >= 2 else logging.INFO if verbose == 1 else logging.WARNING
 
     try:
         return args.func(args)
