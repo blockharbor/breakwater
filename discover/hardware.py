@@ -2,7 +2,6 @@
 # Copyright (C) 2024-2026 Block Harbor Cybersecurity LLC
 
 import os
-import socket
 from pyroute2 import IPRoute
 from utils.netutil import temporary_static_ip
 from serial.tools.list_ports import comports
@@ -35,6 +34,11 @@ def bittiming_const(nla):
         )
         if field in nla
     }
+
+
+def ip_addresses(ip_route, idx):
+    """The interface's IPv4 and IPv6 addresses in CIDR notation."""
+    return [f"{a.get_attr('IFA_ADDRESS')}/{a['prefixlen']}" for a in ip_route.get_addr(index=idx)]
 
 
 def get_interfaces():
@@ -131,20 +135,17 @@ def get_interfaces():
                     wifi_obj["name"] = f
                     with open(f"/sys/class/net/{f}/address", "r") as mac_f:
                         wifi_obj["mac"] = mac_f.read().strip()
-                    temp_ip = temporary_static_ip(f)
-                    ip = temp_ip.get_ip()
-                    if ip:
-                        wifi_obj["ip"] = socket.inet_ntoa(ip)
-                        mask = temp_ip.get_mask()
-                        if mask:
-                            wifi_obj["subnetmask"] = socket.inet_ntoa(mask)
-                        wifi_obj["gateway"] = temp_ip.get_gateway()
                     idx = ip_route.link_lookup(ifname=f)
                     if idx == None:
                         continue
                     
                     assert(len(idx) == 1)
                     idx = idx[0]
+
+                    wifi_obj["addresses"] = ip_addresses(ip_route, idx)
+                    gateway = temporary_static_ip(f).get_gateway()
+                    if gateway:
+                        wifi_obj["gateway"] = gateway
 
                     link = ip_route.link("get", index=idx)
 
@@ -162,22 +163,17 @@ def get_interfaces():
                     eth_obj["name"] = f
                     with open(f"/sys/class/net/{f}/address", "r") as mac_f:
                         eth_obj["mac"] = mac_f.read().strip()
-                    temp_ip = temporary_static_ip(f)
-                    ip = temp_ip.get_ip()
-                    if ip:
-                        eth_obj["ip"] = socket.inet_ntoa(ip)
-                        mask = temp_ip.get_mask()
-                        if mask:
-                            temp_mask = temp_ip.get_mask()
-                            assert(type(temp_mask) == bytes)
-                            eth_obj["subnetmask"] = socket.inet_ntoa(temp_mask)
-                        eth_obj["gateway"] = temp_ip.get_gateway()
                     idx = ip_route.link_lookup(ifname=f)
                     if idx == None:
                         continue
                     
                     assert(len(idx) == 1)
                     idx = idx[0]
+
+                    eth_obj["addresses"] = ip_addresses(ip_route, idx)
+                    gateway = temporary_static_ip(f).get_gateway()
+                    if gateway:
+                        eth_obj["gateway"] = gateway
 
                     link = ip_route.link("get", index=idx)
 

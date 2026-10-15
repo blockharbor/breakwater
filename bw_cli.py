@@ -10,6 +10,7 @@ import logging
 import time
 import shutil
 import argparse
+from datetime import datetime, timezone
 
 from framework import (DEP_MODULES, AuditLoadError, Logger, Status, describe_audit, dependency_dir,
                        enable_dependency_dir, get_version, list_audits, load_audit_path, missing_dependencies,
@@ -29,7 +30,7 @@ EPILOG = """examples:
 
 exit codes:
   0  passed / ok           1  failed (target vulnerable)    2  no result
-  64 usage (bad args)      69 missing dependencies
+  64 usage (bad args)      69 missing dependencies      74 a discovery scan failed
 """
 
 class UsageError(Exception):
@@ -182,26 +183,91 @@ def _did_param(params, key, default):
         raise UsageError(f'{key} {value} is outside 0x0000-0xFFFF')
     return did
 
+# The interface types each discovery scan runs on
+SCAN_IFACE_TYPES = {'uds': ('can',), 'xcp': ('can',), 'ip': ('eth', 'wifi')}
+
+def _utc_now():
+    return datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
+
 def _cmd_discover(args):
     params = _params(args.parameter)
     # `device` is the older name for `iface`
     if 'device' in params and 'iface' in params:
         raise UsageError('set either iface or device, not both')
     iface = params.get('iface', params.get('device'))
+    if not iface:
+        raise UsageError('set the interfaces to scan, e.g. -p iface=can0 or -p iface=can0,can1')
+    ifaces = [name.strip() for name in iface.split(',')]
     # Inclusive range of DIDs read with 0x22 in each session that supports it
     min_did = _did_param(params, 'min_did', '0xF180')
     max_did = _did_param(params, 'max_did', '0xF1A0')
     if min_did > max_did:
         raise UsageError(f'min_did {hex(min_did)} is above max_did {hex(max_did)}')
+    protocol = params.get('protocol')
+    if protocol not in (None, *SCAN_IFACE_TYPES):
+        raise UsageError(f'protocol "{protocol}" is not uds, xcp or ip')
     try:
-        from discover.can import discover_can
-        from discover.xcp import discover_xcp
+        from discover.hardware import get_interfaces
+        from discover.can import discover_uds, discover_xcp
+        from discover.eth import discover_ip, DISCOVER_PORTS
     except ImportError as e:
         return _unavailable('discovery', e)
-    log = cli_logger('discover.' + (iface if iface else 'all'))
-    res = discover_can(iface, log, min_did=min_did, max_did=max_did) + discover_xcp(iface, log)
-    print(json.dumps(res, indent=4))
-    return os.EX_OK
+
+    # Check every interface before scanning any, so a typo does not cost a long scan first
+    available = {i.pop('name'): i | {'type': kind} for kind, found in get_interfaces().items() for i in found}
+    plan = {}
+    for name in ifaces:
+        if name not in available:
+            raise UsageError(f'interface {name} not found, see `bw_cli interfaces`')
+        kind = available[name]['type']
+        plan[name] = [s for s, kinds in SCAN_IFACE_TYPES.items() if protocol in (None, s) and kind in kinds]
+        if not plan[name]:
+            raise UsageError(f'no {protocol} scan on {name}, its type is {kind}')
+
+    scanners = {
+        'uds': lambda i, log: discover_uds(i, log, min_did=min_did, max_did=max_did),
+        'xcp': discover_xcp,
+        'ip': discover_ip,
+    }
+    # The parameters in effect, defaults included, for the scans that run
+    used = {s for scans in plan.values() for s in scans}
+    run_params = {'iface': ifaces, 'protocol': protocol}
+    if 'uds' in used:
+        run_params |= {'min_did': min_did, 'max_did': max_did}
+    if 'ip' in used:
+        run_params['ports'] = DISCOVER_PORTS
+
+    started = _utc_now()
+    interfaces = {}
+    errors = 0
+    for name, scans in plan.items():
+        info = available[name]
+        info.pop('stats', None)
+        info['scans'] = {}
+        for scan in scans:
+            log = cli_logger(f'discover.{scan}.{name}')
+            t = time.monotonic()
+            try:
+                result = {'targets': scanners[scan]({'name': name} | info, log)}
+            except Exception as e:
+                log.error(f'{scan} scan on {name} failed: {e}')
+                result = {'error': str(e)}
+                errors += 1
+            info['scans'][scan] = {'duration': round(time.monotonic() - t, 1)} | result
+        interfaces[name] = info
+
+    print(json.dumps({
+        '_metadata': {
+            'format': 1,    # layout version, bump it only when a reader would break
+            'version': get_version(),
+            'started': started,
+            'finished': _utc_now(),
+            'params': run_params,
+            'errors': errors,
+        },
+        'interfaces': interfaces,
+    }, indent=4))
+    return os.EX_IOERR if errors else os.EX_OK
 
 def _cmd_interfaces(args):
     try:
@@ -285,8 +351,8 @@ def _build_parser():
     _common_args(p)
     p.set_defaults(func=_cmd_run)
 
-    p = sub.add_parser('discover', help='discover CAN (UDS) and XCP targets, -p iface=NAME (or device=NAME) limits it to one interface, '
-                       '-p min_did=0xF180 -p max_did=0xF1A0 sets the DID read range')
+    p = sub.add_parser('discover', help='discover UDS and XCP targets on CAN and IP hosts on Ethernet, -p iface=NAME[,NAME...] (or device=) picks the interfaces, '
+                       '-p min_did=0xF180 -p max_did=0xF1A0 sets the DID read range, -p protocol=uds, xcp or ip runs only that scan')
     _add_param_arg(p)
     _common_args(p)
     p.set_defaults(func=_cmd_discover)

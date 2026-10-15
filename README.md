@@ -1,7 +1,7 @@
 # Breakwater
 
 Breakwater runs security audits against automotive CAN and network interfaces
-and discovers targets on CAN buses, through a single command-line tool,
+and discovers targets on CAN buses and IP networks, through a single command-line tool,
 `bw_cli`.
 
 - 22 built-in audits: UDS (security access, memory read/write, upload/download,
@@ -9,7 +9,8 @@ and discovers targets on CAN buses, through a single command-line tool,
   bus DoS recovery, and network checks (TLS versions and ciphers, mTLS with a
   self-signed certificate, SSH password login, telnet anonymous login).
 - Discovery of UDS servers (sessions, services, DIDs) and XCP slaves over
-  SocketCAN, including CAN FD.
+  SocketCAN, including CAN FD, and of IP hosts and their open TCP ports on
+  Ethernet and Wi-Fi, without root.
 - Audit metadata as text, Markdown or JSON.
 
 Documentation: https://docs.blockharbor.io
@@ -53,6 +54,9 @@ bw_cli info --markdown > audits.md           # every audit as a docs page
 bw_cli interfaces                            # host interfaces as JSON
 bw_cli discover -p iface=can0                # UDS and XCP targets on can0
 bw_cli discover -p iface=can0 -p min_did=0x0000 -p max_did=0x00FF   # read DIDs 0x0000-0x00FF instead
+bw_cli discover -p iface=can0 -p protocol=xcp # XCP only (protocol=uds: UDS only)
+bw_cli discover -p iface=eth0 -p protocol=ip  # hosts on eth0 (ARP sweep, IPv6 ping) and their open TCP ports
+bw_cli discover -p iface=can0,eth0             # every scan that fits each interface
 bw_cli run uds_security_access -p iface=can0 -p req_arb=0x7e0 -p resp_arb=0x7e8
 bw_cli run telnet_check -p target_host=10.1.0.1 --json
 ```
@@ -66,6 +70,13 @@ stderr, so stdout holds only the report or the JSON. By default only warnings an
 final verdict, `-vv` adds debug output such as the parameters and each request.
 Parameters you don't set take the defaults shown by `bw_cli info`.
 
+`discover` prints one JSON object. `_metadata` holds the layout version
+(`format`), the Breakwater `version`, `started` and `finished` times (UTC), the
+`params` in effect and the number of failed scans (`errors`). `interfaces` maps
+each scanned interface to its description, as `bw_cli interfaces` gives it, and
+its `scans` (`uds`, `xcp`, `ip`). Each scan has a `duration` in seconds and
+either its `targets` or an `error`; a failed scan does not stop the others.
+
 Every audit and `discover` name the interface `iface`. The older name `device`
 is accepted as well; setting both is an error.
 
@@ -76,6 +87,7 @@ is accepted as well; setting both is an error.
 | 2 | no result: the target was unreachable or a parameter was bad |
 | 64 | usage error |
 | 69 | missing dependencies |
+| 74 | `discover`: at least one scan failed |
 
 ### Audit dependencies
 
