@@ -154,14 +154,15 @@ def _cmd_run(args):
     logger = cli_logger(name)
     result = run_audit(name, params, logger, install_deps=args.install_deps)
 
+    if args.json:
+        print(json.dumps({'status': result.status.name, 'result': result.raw, 'report': result.report}, indent=4))
+
     if result.raw.get('missing_dependencies'):
         logger.error(f"Missing dependencies: {', '.join(result.raw['missing_dependencies'])}. "
                      f"Install them with `bw_cli run {name} --install-deps`.")
         return os.EX_UNAVAILABLE
 
-    if args.json:
-        print(json.dumps(result.raw, indent=4))
-    else:
+    if not args.json:
         for section in result.report:
             print(_style(section['title'], '1'))
             for segment in section['segments']:
@@ -280,7 +281,7 @@ def _build_parser():
     _add_param_arg(p)
     p.add_argument('--install-deps', action='store_true',
                    help="install missing audit dependencies into Breakwater's own directory (see `bw_cli deps`)")
-    p.add_argument('--json', action='store_true', help='print the raw result as JSON instead of the readable report')
+    p.add_argument('--json', action='store_true', help='print the status, raw result and report as JSON instead of the readable report')
     _common_args(p)
     p.set_defaults(func=_cmd_run)
 

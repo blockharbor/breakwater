@@ -59,9 +59,10 @@ bw_cli run telnet_check -p target_host=10.1.0.1 --json
 
 From a checkout, use `./bw_cli.py` in place of `bw_cli`.
 
-`run` prints a readable report on stdout, or the audit's raw result as JSON with
-`--json`; log messages go to stderr, so stdout holds only the report or the
-JSON. By default only warnings and errors are logged; `-v` adds progress and the
+`run` prints a readable report on stdout. With `--json` it prints
+`{"status": "PASSED" | "FAILED" | "NO_RESULT", "result": {...}, "report": [...]}`
+instead: the audit's raw result and the same report as data. Log messages go to
+stderr, so stdout holds only the report or the JSON. By default only warnings and errors are logged; `-v` adds progress and the
 final verdict, `-vv` adds debug output such as the parameters and each request.
 Parameters you don't set take the defaults shown by `bw_cli info`.
 

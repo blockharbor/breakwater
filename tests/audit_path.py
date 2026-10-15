@@ -67,18 +67,18 @@ bw_tc('example_custom_flag', bw_res.FAILED, {'flag': '1'}, bw_tc_base_sim('custo
 
 def describe_custom():
     path = os.path.join(custom_dir, 'example_custom_flag.py')
-    d = describe_audit('example_custom_flag')
-    assert d['source'] == path, d['source']
-    assert d['sha256'] == sha256_of(path), d['sha256']
-    assert d['fileName'] == 'example_custom_flag.py', d['fileName']
-    assert d['isCustom'] is True
+    desc = describe_audit('example_custom_flag')
+    assert desc['source'] == path, desc['source']
+    assert desc['sha256'] == sha256_of(path), desc['sha256']
+    assert desc['fileName'] == 'example_custom_flag.py', desc['fileName']
+    assert desc['isCustom'] is True
 bw_tc_func('audit_path.describe_custom', describe_custom)
 
 def describe_builtin():
-    d = describe_audit('uds_security_access')
-    assert d['source'].endswith(os.path.join('audits', 'can', 'uds_security_access.py')), d['source']
-    assert d['sha256'] == sha256_of(d['source']), d['sha256']
-    assert d['isCustom'] is False
+    desc = describe_audit('uds_security_access')
+    assert desc['source'].endswith(os.path.join('audits', 'can', 'uds_security_access.py')), desc['source']
+    assert desc['sha256'] == sha256_of(desc['source']), desc['sha256']
+    assert desc['isCustom'] is False
 bw_tc_func('audit_path.describe_builtin', describe_builtin)
 
 def single_file():
@@ -134,11 +134,13 @@ def cli_info_and_run():
                  ['info', 'example_custom_flag', '--json', '--audit-path', path]):
         r = bw_cli(*args)
         assert r.returncode == 0, r.stderr
-        d = json.loads(r.stdout)
-        assert d['source'] == path and d['sha256'] == sha256_of(path), d
+        info = json.loads(r.stdout)
+        assert info['source'] == path and info['sha256'] == sha256_of(path), info
     r = bw_cli('--audit-path', custom_dir, 'run', 'example_custom_flag', '-p', 'flag=1', '--json')
     assert r.returncode == 1, r.stderr
-    assert json.loads(r.stdout)['pass_rules']['vulnerable'] is True
+    run = json.loads(r.stdout)
+    assert run['status'] == 'FAILED' and run['result']['pass_rules']['vulnerable'] is True, run
+    assert run['report'] and run['report'][0]['title'], run
     r = bw_cli('run', 'example_custom_flag')
     assert r.returncode == os.EX_USAGE, r.stderr
 bw_tc_func('audit_path.cli_info_and_run', cli_info_and_run)
