@@ -51,6 +51,18 @@ def discover_bad_protocol():
     assert 'not uds, xcp or ip' in r.stderr, r.stderr
 bw_tc_func('params.discover_bad_protocol', discover_bad_protocol)
 
+# discover never picks interfaces itself: none set, an unknown one or a scan that
+# does not fit the interface type is a usage error, before any scan starts
+def discover_bad_ifaces():
+    for params, expect in (([], 'set the interfaces'),
+                           (['-p', 'iface=vcan0,nosuch0'], 'nosuch0 not found'),
+                           (['-p', 'iface=vcan0', '-p', 'protocol=ip'], 'no ip scan on vcan0')):
+        r = subprocess.run([sys.executable, BW_CLI, 'discover', *params],
+                           capture_output=True, text=True, timeout=60)
+        assert r.returncode == os.EX_USAGE, (params, r.returncode)
+        assert expect in r.stderr, (params, r.stderr)
+bw_tc_func('params.discover_bad_ifaces', discover_bad_ifaces)
+
 # A built-in CAN audit declares iface; the old name still reaches the bus. With
 # the alias ignored, the audit would open its default can0 and report no result.
 device_params = {'device': 'vcan0', 'req_arb': '0x7e0', 'resp_arb': '0x7e8', 'session': '1',
