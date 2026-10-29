@@ -56,8 +56,8 @@ DEPENDS := -d "python3 (>= 3.9)" -d "python3-can (>= 4.1)" \
            -d "python3-paramiko (>= 2.11)" -d "python3-requests (>= 2.28)"
 RECOMMENDS ?= can-utils, python3-pip
 
-# Replaces the old breakwater package, which shipped bw_cli up to 3.1.1.
-REPLACES_VERSION ?= 3.1.1
+# Replaces the old breakwater package, which shipped bw_cli in every build before 3.1.2.
+REPLACES_VERSION ?= 3.1.2~
 
 help:
 	@echo 'Packaging for breakwater. Run from a checkout with: pip install -r requirements.txt && ./bw_cli.py'
@@ -102,8 +102,8 @@ package: _check-fpm
 		--license "GPL-2.0-only" \
 		$(DEPENDS) \
 		--deb-recommends "$(RECOMMENDS)" \
-		--replaces "breakwater (<= $(REPLACES_VERSION))" \
-		--deb-field "Breaks: breakwater (<= $(REPLACES_VERSION))" \
+		--replaces "breakwater (<< $(REPLACES_VERSION))" \
+		--deb-field "Breaks: breakwater (<< $(REPLACES_VERSION))" \
 		--after-remove build/pkg/postrm \
 		--deb-no-default-config-files \
 		--config-files /etc/systemd/network/80-can.network \
