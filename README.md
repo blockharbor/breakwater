@@ -37,10 +37,10 @@ As a Debian/Ubuntu package (Debian bookworm and trixie, Ubuntu noble), built
 with `make package` (needs [fpm](https://fpm.readthedocs.io/)):
 
 ```bash
-sudo apt install ./build/dist/deb/breakwater_<version>_all.deb
+sudo apt install ./build/dist/deb/breakwater-cli_<version>_all.deb
 ```
 
-The `.deb` pulls python-can, pyroute2, pyserial, paramiko and requests from
+The `breakwater-cli` package pulls python-can, pyroute2, pyserial, paramiko and requests from
 the distribution. can-isotp is not packaged by any distribution, so the UDS
 audits and discovery get it through pip (`--install-deps`, see below).
 

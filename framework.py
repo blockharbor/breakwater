@@ -227,7 +227,8 @@ def pip_install(deps, log):
     target = dependency_dir()
     try:
         log.info(f'Attempting to install {deps} into {target}')
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--target", target] + deps)
+        # pip's progress goes to stderr: stdout carries the JSON of --json
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--target", target] + deps, stdout=sys.stderr)
         enable_dependency_dir()
         log.info(f'Successfully installed {deps}')
         return True
@@ -246,6 +247,8 @@ class AuditRunner:
     relevant_interfaces = []
     relevant_mitigations = []
     bw_audit_id = "N/A"
+    description = ""
+    fail_condition = ""
 
     def __init__(self, params: dict, logger=None):
         self.params = params

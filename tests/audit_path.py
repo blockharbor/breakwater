@@ -74,6 +74,16 @@ def describe_custom():
     assert desc['isCustom'] is True
 bw_tc_func('audit_path.describe_custom', describe_custom)
 
+# A custom audit may leave out its description and fail condition
+def describe_minimal():
+    d = make_dir({'example_custom_minimal.py': audit_source('example_custom_minimal')
+                  .replace('    description = "Fails when flag is 1"\n', '')
+                  .replace('    fail_condition = "flag is 1"\n', '')})
+    load_audit_path(d)
+    desc = describe_audit('example_custom_minimal')
+    assert desc['description'] == '' and desc['failCondition'] == '', desc
+bw_tc_func('audit_path.describe_minimal', describe_minimal)
+
 def describe_builtin():
     desc = describe_audit('uds_security_access')
     assert desc['source'].endswith(os.path.join('audits', 'can', 'uds_security_access.py')), desc['source']

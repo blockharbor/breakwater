@@ -35,6 +35,7 @@ VERSION ?= $(patsubst v%,%,$(GIT_VERSION))
 .PHONY: help package _check-fpm clean version-tag
 
 DIST := build/dist
+PKG := breakwater-cli
 # The program is installed as a plain source tree; /usr/bin/bw_cli runs bw_cli.py from it.
 APP := usr/share/breakwater
 SOURCES := bw_cli.py framework.py audits discover utils
@@ -55,13 +56,16 @@ DEPENDS := -d "python3 (>= 3.9)" -d "python3-can (>= 4.1)" \
            -d "python3-paramiko (>= 2.11)" -d "python3-requests (>= 2.28)"
 RECOMMENDS ?= can-utils, python3-pip
 
+# Replaces the old breakwater package, which shipped bw_cli up to 3.1.1.
+REPLACES_VERSION ?= 3.1.1
+
 help:
 	@echo 'Packaging for breakwater. Run from a checkout with: pip install -r requirements.txt && ./bw_cli.py'
 	@echo ''
 	@echo -e '  VERSION    \t$(if $(VERSION),$(VERSION),(none - no git tag found))'
 	@echo ''
 	@echo 'Targets:'
-	@echo -e '  package            \t build $(DIST)/deb/breakwater_<VERSION>_all.deb (needs fpm)'
+	@echo -e '  package            \t build $(DIST)/deb/$(PKG)_<VERSION>_all.deb (needs fpm)'
 	@echo -e '  clean              \t remove $(DIST)/'
 	@echo -e '  version-tag        \t create an annotated git tag (VERSION=vN.N.N[-suffix] required)'
 	@echo ''
@@ -76,18 +80,18 @@ _check-fpm:
 # Pure Python, so one Architecture: all package covers every arch.
 package: _check-fpm
 	@test -n "$(VERSION)" || (echo "Error: VERSION is empty. Create a git tag (make version-tag VERSION=vN.N.N) or pass VERSION=N.N.N." && exit 1)
-	rm -rf $(DIST)/stage/breakwater
-	mkdir -p $(DIST)/stage/breakwater/$(APP)
-	git ls-files -z $(SOURCES) | xargs -0 cp --parents -t $(DIST)/stage/breakwater/$(APP)
-	printf "VERSION = '%s'\n" '$(VERSION)' > $(DIST)/stage/breakwater/$(APP)/_version.py
-	install -Dm755 build/pkg/bw_cli $(DIST)/stage/breakwater/usr/bin/bw_cli
-	install -Dm644 build/pkg/80-can.network $(DIST)/stage/breakwater/etc/systemd/network/80-can.network
-	install -Dm644 build/pkg/copyright $(DIST)/stage/breakwater/usr/share/doc/breakwater/copyright
+	rm -rf $(DIST)/stage/$(PKG)
+	mkdir -p $(DIST)/stage/$(PKG)/$(APP)
+	git ls-files -z $(SOURCES) | xargs -0 cp --parents -t $(DIST)/stage/$(PKG)/$(APP)
+	printf "VERSION = '%s'\n" '$(VERSION)' > $(DIST)/stage/$(PKG)/$(APP)/_version.py
+	install -Dm755 build/pkg/bw_cli $(DIST)/stage/$(PKG)/usr/bin/bw_cli
+	install -Dm644 build/pkg/80-can.network $(DIST)/stage/$(PKG)/etc/systemd/network/80-can.network
+	install -Dm644 build/pkg/copyright $(DIST)/stage/$(PKG)/usr/share/doc/$(PKG)/copyright
 	@mkdir -p $(DIST)/deb
-	@rm -f $(DIST)/deb/breakwater_$(VERSION)_all.deb
+	@rm -f $(DIST)/deb/$(PKG)_$(VERSION)_all.deb
 	fpm \
 		-s dir -t deb -a all \
-		-n breakwater \
+		-n $(PKG) \
 		-v "$(VERSION)" \
 		-m "$(MAINTAINER)" \
 		--description "$(DESCRIPTION)" \
@@ -98,11 +102,13 @@ package: _check-fpm
 		--license "GPL-2.0-only" \
 		$(DEPENDS) \
 		--deb-recommends "$(RECOMMENDS)" \
+		--replaces "breakwater (<= $(REPLACES_VERSION))" \
+		--deb-field "Breaks: breakwater (<= $(REPLACES_VERSION))" \
 		--after-remove build/pkg/postrm \
 		--deb-no-default-config-files \
 		--config-files /etc/systemd/network/80-can.network \
-		-p $(DIST)/deb/breakwater_$(VERSION)_all.deb \
-		-C $(DIST)/stage/breakwater .
+		-p $(DIST)/deb/$(PKG)_$(VERSION)_all.deb \
+		-C $(DIST)/stage/$(PKG) .
 
 clean:
 	-rm -rf $(DIST)/
