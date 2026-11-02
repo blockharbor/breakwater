@@ -389,7 +389,10 @@ def main(argv=None):
     except AuditLoadError as e:
         print(f'bw_cli: {e}', file=sys.stderr)
         return os.EX_USAGE
-    _banner(len(list_audits()))     # before parsing, so --help and usage errors show it too
+    # Before parsing, so --help and usage errors show it too. Only on a
+    # terminal: in a service's log or a pipe it is noise.
+    if sys.stderr.isatty():
+        _banner(len(list_audits()))
 
     parser = _build_parser()
     args = parser.parse_args(argv)
