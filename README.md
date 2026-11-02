@@ -4,6 +4,9 @@ Breakwater runs security audits against automotive CAN and network interfaces
 and discovers targets on CAN buses and IP networks, through a single command-line tool,
 `bw_cli`.
 
+More documentation, including each audit's parameters and how to write your
+own, is available at https://docs.vsec.blockharbor.io/vsec-test/.
+
 - 22 built-in audits: UDS (security access, memory read/write, upload/download,
   IO and communication control), CCP and XCP (upload, download, program), CAN
   bus DoS recovery, and network checks (TLS versions and ciphers, mTLS with a
@@ -12,8 +15,6 @@ and discovers targets on CAN buses and IP networks, through a single command-lin
   SocketCAN, including CAN FD, and of IP hosts and their open TCP ports on
   Ethernet and Wi-Fi, without root.
 - Audit metadata as text, Markdown or JSON.
-
-Documentation: https://docs.blockharbor.io
 
 ## Safety
 
