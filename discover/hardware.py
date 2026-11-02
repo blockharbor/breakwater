@@ -3,6 +3,8 @@
 
 import os
 import sys
+import json
+import subprocess
 from pyroute2 import IPRoute
 from utils.netutil import temporary_static_ip
 from serial.tools.list_ports import comports
@@ -56,13 +58,13 @@ def _flag(nla, name, on):
 
 def can_settings(name, linkinfo):
     """Bitrates, clock, timing limits and modes of a CAN interface from its
-    IFLA_LINKINFO. pyroute2 decodes them from 0.7.10 on; an older one returns
-    them as a hex string, and the interface is then listed without them."""
+    IFLA_LINKINFO. pyroute2 decodes them from 0.7.10 on; an older one, such
+    as Debian trixie's 0.7.7, returns them as a hex string, and they are read
+    from iproute2 instead."""
     out = {}
     data = [a[1] for a in _attrs(linkinfo) if a[0] == "IFLA_INFO_DATA"]
     if data and not _attrs(data[0]):
-        print(f"bw_cli: {name}: pyroute2 {_pyroute2_version()} cannot read CAN settings, "
-              "listing it without bitrate and modes (needs pyroute2 0.7.10 or later)", file=sys.stderr)
+        return ip_can_settings(name)
     for key, value in (a for d in data for a in _attrs(d)):
         if key == "IFLA_CAN_BITTIMING" and isinstance(value, dict):
             out["bitrate"] = value.get("bitrate")
@@ -88,6 +90,69 @@ def can_settings(name, linkinfo):
                 for mode in ("loopback", "listenonly", "fd"):
                     if (yes := _flag(supported, mode, "yes")) is not None:
                         out[mode + "_supported"] = yes
+    return out
+
+
+def ip_can_settings(name):
+    """can_settings() from `ip -details -json link show`, for a pyroute2 that
+    cannot decode them. Listed without them if that fails too."""
+    try:
+        out = subprocess.run(["ip", "-details", "-json", "link", "show", "dev", name],
+                             capture_output=True, text=True, timeout=10, check=True).stdout
+        info = json.loads(out)[0]["linkinfo"]["info_data"]
+    except (OSError, subprocess.SubprocessError, ValueError, LookupError, TypeError) as e:
+        print(f"bw_cli: {name}: pyroute2 {_pyroute2_version()} cannot read CAN settings and "
+              f"ip failed too ({e}), listing it without bitrate and modes", file=sys.stderr)
+        return {}
+    return can_settings_from_ip(info)
+
+
+# iproute2's names for the modes bw_cli reports
+IP_CTRLMODES = {"loopback": "LOOPBACK", "listenonly": "LISTEN-ONLY", "fd": "FD"}
+
+
+def _ip_timing_const(c):
+    """iproute2's {"tseg1": {"min": 1, "max": 256}, ...} as bittiming_const() keys"""
+    flat = {}
+    for field in ("tseg1", "tseg2", "sjw", "brp"):
+        for bound in ("min", "max"):
+            if isinstance(c.get(field), dict) and bound in c[field]:
+                flat[f"{field}_{bound}"] = c[field][bound]
+    if "brp_inc" in c:
+        flat["brp_inc"] = c["brp_inc"]
+    return bittiming_const(flat)
+
+
+def _ip_sample_point(v):
+    """iproute2 prints "0.875"; pyroute2 and the kernel use tenths of a percent"""
+    try:
+        return round(float(v) * 1000)
+    except (TypeError, ValueError):
+        return None
+
+
+def can_settings_from_ip(info):
+    """can_settings() keys from the info_data of `ip -details -json link show`"""
+    out = {}
+    for prefix, key in (("", "bittiming"), ("fd_", "data_bittiming")):
+        t = info.get(key)
+        if isinstance(t, dict):
+            if "bitrate" in t:
+                out[prefix + "bitrate"] = t["bitrate"]
+            if "sample_point" in t:
+                out[prefix + "sample_point"] = _ip_sample_point(t["sample_point"])
+    if "clock" in info:
+        out["clock_freq"] = info["clock"]
+    for prefix, key in (("", "bittiming_const"), ("fd_", "data_bittiming_const")):
+        if isinstance(info.get(key), dict):
+            out[prefix + "bittiming_const"] = _ip_timing_const(info[key])
+    # iproute2 leaves ctrlmode out when no mode is on
+    modes = info.get("ctrlmode") or []
+    for mode, ip_name in IP_CTRLMODES.items():
+        out[mode] = ip_name in modes
+    if isinstance(info.get("ctrlmode_supported"), list):
+        for mode, ip_name in IP_CTRLMODES.items():
+            out[mode + "_supported"] = ip_name in info["ctrlmode_supported"]
     return out
 
 
