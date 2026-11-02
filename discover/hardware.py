@@ -2,6 +2,7 @@
 # Copyright (C) 2024-2026 Block Harbor Cybersecurity LLC
 
 import os
+import sys
 from pyroute2 import IPRoute
 from utils.netutil import temporary_static_ip
 from serial.tools.list_ports import comports
@@ -41,6 +42,63 @@ def ip_addresses(ip_route, idx):
     return [f"{a.get_attr('IFA_ADDRESS')}/{a['prefixlen']}" for a in ip_route.get_addr(index=idx)]
 
 
+def _attrs(nla):
+    """The attributes inside a nested netlink attribute, or [] when pyroute2
+    left it undecoded, as a hex string."""
+    attrs = nla.get("attrs") if isinstance(nla, dict) else None
+    return attrs if isinstance(attrs, list) else []
+
+
+def _flag(nla, name, on):
+    """One mode of a CAN ctrlmode attribute, or None if it is not there"""
+    return nla[name] == on if isinstance(nla, dict) and name in nla else None
+
+
+def can_settings(name, linkinfo):
+    """Bitrates, clock, timing limits and modes of a CAN interface from its
+    IFLA_LINKINFO. pyroute2 decodes them from 0.7.10 on; an older one returns
+    them as a hex string, and the interface is then listed without them."""
+    out = {}
+    data = [a[1] for a in _attrs(linkinfo) if a[0] == "IFLA_INFO_DATA"]
+    if data and not _attrs(data[0]):
+        print(f"bw_cli: {name}: pyroute2 {_pyroute2_version()} cannot read CAN settings, "
+              "listing it without bitrate and modes (needs pyroute2 0.7.10 or later)", file=sys.stderr)
+    for key, value in (a for d in data for a in _attrs(d)):
+        if key == "IFLA_CAN_BITTIMING" and isinstance(value, dict):
+            out["bitrate"] = value.get("bitrate")
+            out["sample_point"] = value.get("sample_point")
+        # The CAN FD data phase timing, reported alongside the nominal bitrate
+        elif key == "IFLA_CAN_DATA_BITTIMING" and isinstance(value, dict):
+            out["fd_bitrate"] = value.get("bitrate")
+            out["fd_sample_point"] = value.get("sample_point")
+        # The clock and the timing constants decide which bitrates and
+        # sample points the controller can reach
+        elif key == "IFLA_CAN_CLOCK":
+            out["clock_freq"] = value
+        elif key == "IFLA_CAN_BITTIMING_CONST" and isinstance(value, dict):
+            out["bittiming_const"] = bittiming_const(value)
+        elif key == "IFLA_CAN_DATA_BITTIMING_CONST" and isinstance(value, dict):
+            out["fd_bittiming_const"] = bittiming_const(value)
+        elif key == "IFLA_CAN_CTRLMODE":
+            for mode in ("loopback", "listenonly", "fd"):
+                if (on := _flag(value, mode, "on")) is not None:
+                    out[mode] = on
+        elif key == "IFLA_CAN_CTRLMODE_EXT":
+            for supported in (v for k, v in _attrs(value) if k == "IFLA_CAN_CTRLMODE_SUPPORTED"):
+                for mode in ("loopback", "listenonly", "fd"):
+                    if (yes := _flag(supported, mode, "yes")) is not None:
+                        out[mode + "_supported"] = yes
+    return out
+
+
+def _pyroute2_version():
+    try:
+        from pyroute2 import __version__
+        return __version__
+    except ImportError:
+        return "(unknown version)"
+
+
 def get_interfaces():
     interfaces = {"can": [], "eth": [], "wifi": [], "bt": [], "usb": []}
 
@@ -76,57 +134,7 @@ def get_interfaces():
                     elif attr[0] == "IFLA_STATS":
                         can_obj["stats"] = attr[1]
                     elif attr[0] == "IFLA_LINKINFO":
-                        for attr2 in attr[1]["attrs"]:
-                            if attr2[0] == "IFLA_INFO_DATA":
-                                for attr3 in attr2[1]["attrs"]:
-                                    if attr3[0] == "IFLA_CAN_BITTIMING":
-                                        can_obj["bitrate"] = attr3[1]["bitrate"]
-                                        can_obj["sample_point"] = attr3[1][
-                                            "sample_point"
-                                        ]
-                                    # The CAN FD data phase timing, reported
-                                    # alongside the nominal bitrate.
-                                    elif attr3[0] == "IFLA_CAN_DATA_BITTIMING":
-                                        can_obj["fd_bitrate"] = attr3[1]["bitrate"]
-                                        can_obj["fd_sample_point"] = attr3[1][
-                                            "sample_point"
-                                        ]
-                                    # The clock and the timing constants decide
-                                    # which bitrates and sample points the
-                                    # controller can reach.
-                                    elif attr3[0] == "IFLA_CAN_CLOCK":
-                                        can_obj["clock_freq"] = attr3[1]
-                                    elif attr3[0] == "IFLA_CAN_BITTIMING_CONST":
-                                        can_obj["bittiming_const"] = bittiming_const(
-                                            attr3[1]
-                                        )
-                                    elif attr3[0] == "IFLA_CAN_DATA_BITTIMING_CONST":
-                                        can_obj["fd_bittiming_const"] = bittiming_const(
-                                            attr3[1]
-                                        )
-                                    elif attr3[0] == "IFLA_CAN_CTRLMODE":
-                                        can_obj["loopback"] = (
-                                            attr3[1]["loopback"] == "on"
-                                        )
-                                        can_obj["listenonly"] = (
-                                            attr3[1]["listenonly"] == "on"
-                                        )
-                                        can_obj["fd"] = attr3[1]["fd"] == "on"
-                                    elif attr3[0] == "IFLA_CAN_CTRLMODE_EXT":
-                                        for attr4 in attr3[1]["attrs"]:
-                                            if (
-                                                attr4[0]
-                                                == "IFLA_CAN_CTRLMODE_SUPPORTED"
-                                            ):
-                                                can_obj["loopback_supported"] = (
-                                                    attr4[1]["loopback"] == "yes"
-                                                )
-                                                can_obj["listenonly_supported"] = (
-                                                    attr4[1]["listenonly"] == "yes"
-                                                )
-                                                can_obj["fd_supported"] = (
-                                                    attr4[1]["fd"] == "yes"
-                                                )
+                        can_obj.update(can_settings(f, attr[1]))
 
                 interfaces["can"].append(can_obj)
             elif typ == ARPHRD_ETHER:

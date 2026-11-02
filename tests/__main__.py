@@ -12,6 +12,7 @@ import tests.net
 import tests.audit_path
 import tests.params
 import tests.discover
+import tests.hardware
 
 failures = []
 for tc in bw_tc.all_test_cases:
