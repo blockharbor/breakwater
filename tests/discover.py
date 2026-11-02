@@ -159,3 +159,46 @@ def discover_xcp():
         assert supported == ['GET_STATUS'], supported
     with_sim(sim, check)
 bw_tc_func('discover.xcp', discover_xcp)
+
+# --- arbitration id sweep bounds ---------------------------------------------
+
+def scan_bounds(scan, name, response):
+    # A node on the in-process virtual bus that answers the first request on
+    # max_arb only, so the sweep has a hit at the top of the range and the walk
+    # back finds nothing and runs into min_arb. Records every id sent.
+    min_arb, max_arb = 0x100, 0x104
+    scanner = can.Bus(interface='virtual', channel=name)
+    node = can.Bus(interface='virtual', channel=name)
+    sent = []
+    running = True
+
+    def respond():
+        while running:
+            msg = node.recv(0.05)
+            if msg:
+                sent.append(msg.arbitration_id)
+                if msg.arbitration_id == max_arb and sent.count(max_arb) == 1:
+                    node.send(can.Message(arbitration_id=0x7E8, data=response, is_extended_id=False))
+
+    t = threading.Thread(target=respond)
+    t.start()
+    try:
+        scan(scanner, False, min_arb, max_arb, {'discover_speed': 0.01}, ignoring_time=0)
+    finally:
+        running = False
+        t.join()
+        scanner.shutdown()
+        node.shutdown()
+    probes = [a for a in sent if a != 0x7DF]   # the UDS scan also sends TesterPresent
+    assert max_arb in probes, [hex(a) for a in sent]
+    assert min(probes) >= min_arb and max(probes) <= max_arb, [hex(a) for a in sent]
+
+def discover_uds_scan_bounds():
+    from discover.can import discover_uds_servers
+    scan_bounds(discover_uds_servers, 'uds_bounds', [6, 0x50, 0x01, 0, 0x32, 0x01, 0xF4, 0])
+bw_tc_func('discover.uds_scan_bounds', discover_uds_scan_bounds)
+
+def discover_xcp_scan_bounds():
+    from discover.can import discover_xcp_servers
+    scan_bounds(discover_xcp_servers, 'xcp_bounds', [0xFF, 0x15, 0x80, 0x08, 0x08, 0x00, 0x01, 0x01])
+bw_tc_func('discover.xcp_scan_bounds', discover_xcp_scan_bounds)

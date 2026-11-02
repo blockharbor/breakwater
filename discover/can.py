@@ -55,7 +55,7 @@ def discover_uds_servers(bus, is_fd, min_arb, max_arb, config, ignoring_time=5, 
     bus.send(tester_present)
     send_errors = 0
     msg = can.Message(data=[2, 0x10, 1, 0, 0, 0, 0, 0], is_extended_id=arb_id > 0x7FF, is_fd=is_fd)
-    while arb_id < max_arb:
+    while arb_id <= max_arb:
         if arb_id == 0x800:
             msg.is_extended_id = True
         msg.arbitration_id = arb_id
@@ -83,7 +83,10 @@ def discover_uds_servers(bus, is_fd, min_arb, max_arb, config, ignoring_time=5, 
 
     for server in potential_servers:
         found_len = len(servers)
-        for arb_id in range(server[0], server[0] - (16 * arb_step), -arb_step):
+        # The id recorded with a hit can be one step past max_arb, and the walk
+        # back must not go below min_arb.
+        start = min(server[0], max_arb)
+        for arb_id in range(start, max(start - (16 * arb_step), min_arb - 1), -arb_step):
             msg.arbitration_id = arb_id
             bus.send(msg)
             time.sleep(0.1)
@@ -236,7 +239,7 @@ def discover_uds_targets(
     bus = can.Bus(interface="socketcan", channel=can_interface, fd=is_fd)
 
     normal_min = 0x400
-    normal_max = 0x800
+    normal_max = 0x7FF
     extended_min = 0x18DA00F1
     extended_max = 0x18DA0100
     extended_step = 0x1
@@ -381,7 +384,7 @@ def discover_xcp_servers(bus, is_fd, min_arb, max_arb, config, ignoring_time=5, 
         data=[0xFF, 0, 0, 0, 0, 0, 0, 0], is_extended_id=arb_id > 0x7FF, is_fd=is_fd
     )
     send_errors = 0
-    while arb_id < max_arb:
+    while arb_id <= max_arb:
         if arb_id == 0x800:
             connect.is_extended_id = True
         connect.arbitration_id = arb_id
@@ -406,7 +409,10 @@ def discover_xcp_servers(bus, is_fd, min_arb, max_arb, config, ignoring_time=5, 
     servers = []
     for server in potential_servers:
         found_len = len(servers)
-        for arb_id in range(server[0], server[0] - (16 * arb_step), -arb_step):
+        # The id recorded with a hit can be one step past max_arb, and the walk
+        # back must not go below min_arb.
+        start = min(server[0], max_arb)
+        for arb_id in range(start, max(start - (16 * arb_step), min_arb - 1), -arb_step):
             connect.arbitration_id = arb_id
             connect.is_extended_id = arb_id > 0x7FF
             bus.send(connect)
@@ -465,7 +471,7 @@ def discover_xcp_targets(
     bus = can.Bus(interface="socketcan", channel=can_interface, fd=is_fd)
 
     normal_min = 0x000
-    normal_max = 0x800
+    normal_max = 0x7FF
 
     logger.info(f"discovering XCP between {hex(normal_min)}-{hex(normal_max)}")
     servers = discover_xcp_servers(bus, is_fd, normal_min, normal_max, config)
