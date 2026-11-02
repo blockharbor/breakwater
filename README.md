@@ -42,7 +42,7 @@ sudo apt install ./build/dist/deb/breakwater-cli_<version>_all.deb
 
 The `breakwater-cli` package pulls python-can, pyroute2, pyserial, paramiko and requests from
 the distribution. can-isotp is not packaged by any distribution, so the UDS
-audits and discovery get it through pip (`--install-deps`, see below).
+audits and CAN discovery get it through pip (`--install-deps`, see below).
 
 ## Command line
 
@@ -57,6 +57,7 @@ bw_cli discover -p iface=can0 -p min_did=0x0000 -p max_did=0x00FF   # read DIDs 
 bw_cli discover -p iface=can0 -p protocol=xcp # XCP only (protocol=uds: UDS only)
 bw_cli discover -p iface=eth0 -p protocol=ip  # hosts on eth0 (ARP sweep, IPv6 ping) and their open TCP ports
 bw_cli discover -p iface=can0,eth0             # every scan that fits each interface
+bw_cli discover --install-deps -p iface=can0  # first install can-isotp if it is missing
 bw_cli run uds_security_access -p iface=can0 -p req_arb=0x7e0 -p resp_arb=0x7e8
 bw_cli run telnet_check -p target_host=10.1.0.1 --json
 ```
@@ -95,7 +96,9 @@ Each audit lists the Python packages it needs. If one is missing, `run` stops
 with exit code 69 and says which. Add `--install-deps` to install it into
 Breakwater's own directory, `~/.local/share/breakwater/lib/python3.X` (set
 `BW_HOME` to move it). Breakwater never installs into the Python environment
-it runs from. `bw_cli deps` shows the directory and what each audit needs;
+it runs from. `discover --install-deps` does the same for the scans it runs: the UDS and XCP
+scans need can-isotp, the IP scan needs nothing extra, so a missing can-isotp
+never stops an Ethernet scan. `bw_cli deps` shows the directory and what each audit needs;
 `bw_cli deps --clean` deletes it.
 
 ### Custom audits

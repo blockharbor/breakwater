@@ -13,7 +13,7 @@ import argparse
 from datetime import datetime, timezone
 
 from framework import (DEP_MODULES, AuditLoadError, Logger, Status, describe_audit, dependency_dir,
-                       enable_dependency_dir, get_version, list_audits, load_audit_path, missing_dependencies,
+                       enable_dependency_dir, get_version, list_audits, load_audit_path, missing_dependencies, pip_install,
                        run_audit)
 
 DOCS_URL = 'https://docs.blockharbor.io'
@@ -64,12 +64,13 @@ DEP_PINS = {
     'pyroute2': 'pyroute2>=0.7.2,<0.9',
 }
 
-def _unavailable(what, e):
+def _unavailable(what, e, flag=None):
     dist = {module: dist for dist, module in DEP_MODULES.items()}.get(e.name, e.name)
     dist = f"'{DEP_PINS[dist]}'" if dist in DEP_PINS else dist
     print(f'bw_cli: {what} is unavailable: {e}', file=sys.stderr)
     if e.name:
-        print(f'bw_cli: install it with: {sys.executable} -m pip install --target {dependency_dir()} {dist}', file=sys.stderr)
+        print(f'bw_cli: install it with: {sys.executable} -m pip install --target {dependency_dir()} {dist}'
+              + (f', or add {flag}' if flag else ''), file=sys.stderr)
     return os.EX_UNAVAILABLE
 
 def _params(groups):
@@ -185,6 +186,8 @@ def _did_param(params, key, default):
 
 # The interface types each discovery scan runs on
 SCAN_IFACE_TYPES = {'uds': ('can',), 'xcp': ('can',), 'ip': ('eth', 'wifi')}
+# Python packages each discovery scan needs beyond the package's Depends
+SCAN_DEPENDENCIES = {'uds': ('can-isotp',), 'xcp': ('can-isotp',), 'ip': ()}
 
 def _utc_now():
     return datetime.now(timezone.utc).isoformat(timespec='milliseconds').replace('+00:00', 'Z')
@@ -208,8 +211,6 @@ def _cmd_discover(args):
         raise UsageError(f'protocol "{protocol}" is not uds, xcp or ip')
     try:
         from discover.hardware import get_interfaces
-        from discover.can import discover_uds, discover_xcp
-        from discover.eth import discover_ip, DISCOVER_PORTS
     except ImportError as e:
         return _unavailable('discovery', e)
 
@@ -224,13 +225,24 @@ def _cmd_discover(args):
         if not plan[name]:
             raise UsageError(f'no {protocol} scan on {name}, its type is {kind}')
 
-    scanners = {
-        'uds': lambda i, log: discover_uds(i, log, min_did=min_did, max_did=max_did),
-        'xcp': discover_xcp,
-        'ip': discover_ip,
-    }
-    # The parameters in effect, defaults included, for the scans that run
+    # Import only the scans that run, so a missing CAN dependency does not stop an Ethernet scan
     used = {s for scans in plan.values() for s in scans}
+    needed = sorted({dep for s in used for dep in SCAN_DEPENDENCIES[s]})
+    if args.install_deps and not pip_install(needed, cli_logger('discover')):
+        return os.EX_UNAVAILABLE
+    scanners = {}
+    try:
+        if used & {'uds', 'xcp'}:
+            from discover.can import discover_uds, discover_xcp
+            scanners['uds'] = lambda i, log: discover_uds(i, log, min_did=min_did, max_did=max_did)
+            scanners['xcp'] = discover_xcp
+        if 'ip' in used:
+            from discover.eth import discover_ip, DISCOVER_PORTS
+            scanners['ip'] = discover_ip
+    except ImportError as e:
+        return _unavailable('discovery', e, '--install-deps')
+
+    # The parameters in effect, defaults included, for the scans that run
     run_params = {'iface': ifaces, 'protocol': protocol}
     if 'uds' in used:
         run_params |= {'min_did': min_did, 'max_did': max_did}
@@ -354,6 +366,8 @@ def _build_parser():
     p = sub.add_parser('discover', help='discover UDS and XCP targets on CAN and IP hosts on Ethernet, -p iface=NAME[,NAME...] (or device=) picks the interfaces, '
                        '-p min_did=0xF180 -p max_did=0xF1A0 sets the DID read range, -p protocol=uds, xcp or ip runs only that scan')
     _add_param_arg(p)
+    p.add_argument('--install-deps', action='store_true',
+                   help="install what the scans need (can-isotp for uds and xcp) into Breakwater's own directory")
     _common_args(p)
     p.set_defaults(func=_cmd_discover)
 
