@@ -126,12 +126,18 @@ from) and the `sha256` of that file, so a run can be traced to the exact code.
 ## Tests
 
 ```bash
-python3 -m tests
+python3 -m tests                 # the unit tests
+python3 -m tests.registration    # every audit registers without its dependencies
+ruff check .                     # the lint rules in ruff.toml
 ```
 
 The tests simulate targets. The CAN tests need a `vcan0` interface
 (`sudo ip link add dev vcan0 type vcan && sudo ip link set vcan0 up`), and
 `observed_tls_version` needs packet capture rights (root or `CAP_NET_RAW`).
+The registration check needs nothing from requirements.txt: an audit imports
+its dependencies inside `run_audit`, because `bw_cli` loads every audit before
+it can install anything. Every pull request runs all three
+(`.github/workflows/checks.yml`).
 
 ## License
 
