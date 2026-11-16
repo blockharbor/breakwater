@@ -1,0 +1,78 @@
+# Checks every pull request, and every push to develop and master:
+#   ruff          the lint rules in ruff.toml
+#   registration  every built-in audit registers without its dependencies
+#                 (tests/registration.py), on each Python the package supports
+#   unit          the unit tests (python3 -m tests), with vcan0 for the CAN tests
+#
+# Releases are built and published elsewhere, in CodeBuild; nothing here has
+# credentials for that.
+
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [develop, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruff:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: pipx run ruff==0.17.5 check --output-format=github .
+
+  registration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.9 is the oldest the package accepts; 3.11, 3.12 and 3.13 are what
+        # Debian bookworm, Ubuntu noble and Debian trixie ship.
+        python: ["3.9", "3.11", "3.12", "3.13"]
+    # A bare Python with nothing from requirements.txt installed
+    container: python:${{ matrix.python }}-slim
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python -m tests.registration
+
+  unit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up vcan0
+        run: |
+          if ! sudo modprobe vcan 2>/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y "linux-modules-extra-$(uname -r)"
+            sudo modprobe vcan
+          fi
+          sudo ip link add dev vcan0 type vcan
+          sudo ip link set up vcan0
+      # The tests run as root, because observed_tls_version captures packets. The IP
+      # discovery tests run bw_cli again inside a user namespace, where root can't read
+      # a home directory it doesn't own, so the tree and its venv go to /tmp.
+      - name: Install requirements
+        run: |
+          cp -a . /tmp/breakwater
+          python3 -m venv /tmp/venv
+          /tmp/venv/bin/pip install -r /tmp/breakwater/requirements.txt
+      - name: Run the unit tests
+        working-directory: /tmp/breakwater
+        run: sudo /tmp/venv/bin/python -m tests

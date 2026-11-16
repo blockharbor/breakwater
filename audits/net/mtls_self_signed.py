@@ -2,10 +2,6 @@
 # Copyright (C) 2024-2026 Block Harbor Cybersecurity LLC
 
 from framework import *
-import os
-import time
-import requests
-import tempfile
 from utils.netutil import temporary_static_ip
 
 

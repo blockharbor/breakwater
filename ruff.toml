@@ -1,0 +1,16 @@
+# The lint rules CI enforces on every pull request (.github/workflows/checks.yml):
+# syntax errors, including syntax newer than the oldest supported Python, and
+# the pyflakes checks for real mistakes, such as undefined names and duplicate
+# definitions. Left out for now: unused imports and variables, f-strings without
+# placeholders, and star imports, which the audits use for `from framework import *`.
+target-version = "py39"
+
+[lint]
+select = ["E9", "F"]
+ignore = [
+    "F401",  # imported but unused
+    "F403",  # from module import *
+    "F405",  # name may be undefined, or defined from star imports
+    "F541",  # f-string without placeholders
+    "F841",  # local variable assigned but never used
+]
